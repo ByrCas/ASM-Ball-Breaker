@@ -36,9 +36,10 @@ obtenerLecturaTeclado macro arregloLector
     LOCAL leerTecla, finalizar 
     PUSH SI
     PUSH AX
-    xor si,si;Bits de SI en 0  
+    xor si,si;Bits de SI en 0 
+    MOV cl,0 ;cntador de telcas ingresadas 
     leerTecla:
-    obtenerTecla
+        obtenerTecla
         cmp al,retornoCR
         je  finalizar
         mov arregloLector[si],al
@@ -67,7 +68,7 @@ reiniciarLectorFicheros macro
     LOCAL borrar
     PUSH SI  
     MOV si,0;Bits de SI en 0  
-    MOV CX, 200
+    MOV CX, dimensionLectorFicheros
     borrar:
         MOV lectorEntradaFicheros[si], finCadena 
         inc si
@@ -124,50 +125,114 @@ leerArchivoEnrutado macro indicador
     lectura:
         leerArchivo dimensionLectorFicheros,lectorEntradaFicheros,controladorFicheros
         imprimirEnConsola  lectorEntradaFicheros  
-endm  
+endm   
 
-verificarCredenciales macro  
-     LOCAL verificarUsuario, verificarPass, aceptarCaracter, denegarCaracter, desplazarAseparador 
+verifCoin macro
+    leerArchivoEnrutado dl ;se abre y lee el contenido de se archivo 
+    cerrarArchivo controladorFicheros  
+    xor di,di
+    verif:   
+          inc di
+           imprimirEnConsola debug
+          cmp lectorEntradaFicheros[di],2ch
+          jne verif    
+            
+endm                
+       
+verificarIngreso macro  
+     LOCAL LecturaIngresoUsuario, ErrorEntradaUsuario, reVerificarUsuario, verificarUsuario,denegarCaracter, aceptarCaracter, verificarCoincidenciaUsuario,LecturaIngresoPass, ErrorEntradaPass, verificarPass,aceptarCaracterPass, notificarPassErroneo, usuarioInexistente, verificarCoincidenciaPass, accesoUsuario     
+     PUSH SI 
+     PUSH DI
      MOV dl, 0 ;0 indica que se use el archivo Gamers.txt 
      leerArchivoEnrutado dl ;se abre y lee el contenido de se archivo 
      cerrarArchivo controladorFicheros 
      xor si, si
-     xor di, di  
+     xor di, di 
      LecturaIngresoUsuario:  
-	            imprimirEnConsola  solicitudUsuario          
-		        obtenerLecturaTeclado lectorEntradaTeclado
-		        ;VALIDAR EXISTENCIA ACTUAL
-		        reiniciarLectorTeclado 
-		    ;ErrorEntradaUsuario:
-		    ;    imprimirEnConsola usuarioErroneo
-		        ;jmp LecturaIngresoUsuario
-		    LecturaIngresoPass:  
-		        imprimirEnConsola  solicitudPass          
-		        obtenerLecturaTeclado lectorEntradaTeclado 
-		        ;VALIDAR PASS ACTUAL
-		        reiniciarLectorTeclado
-		    ;ErrorEntradaPass:
-		    ;    imprimirEnConsola passErroneo
-		        ;jmp LecturaIngresoPass 
-		    ;VALIDAR ADMIN
-     verificarUsuario:
-        cmp  lectorEntradaTeclado[si], lectorEntradaFicheros[di] 
+        imprimirEnConsola  solicitudUsuario          
+        obtenerLecturaTeclado lectorEntradaTeclado   
+        cmp cl, longMaxUsuario ;si es <= 7 se evalua, si no lo vuelve a solicitar
+        jle verificarUsuario
+        ErrorEntradaUsuario:
+            imprimirEnConsola usuarioMaxError
+            reiniciarLectorTeclado
+            jmp LecturaIngresoUsuario
+     reVerificarUsuario:
+        xor si,si ;Se reinicia SI para evaluar la cadena ingresada nuevamente
+        add di, 3
+        ;dado que actualmente esta ubicado en un ";"(separador)
+        ;necesitamos el siguiente caracter para evaluar otro usuario,
+        ;pero sumamos 3 dado que es ";", "\n", y "\r" lo que separa a cada usuario   
+     verificarUsuario:     
+        cmp  lectorEntradaFicheros[di], finCadena
+        je usuarioInexistente 
+        ;si coincide con fin de cadena significa que ya evaluo todo
+        ;y no hay usuario registrado con ese nombre  
+        MOV bl, lectorEntradaFicheros[di] 
+        cmp  lectorEntradaTeclado[si], bl 
         je aceptarCaracter
-        denegarCaracter:   
-            MOV dl, 0;Será 0 cuando el usuario no coincida 
-            desplazarAseparador: 
-                inc di
-                cmp lectorEntradaFicheros[di], ';'
-                je  verificarPass
-                jmp desplazarAseparador
+        denegarCaracter:
+            ;dado que no coincide el usuario: 
+            ;se desplaza hasta encontrar ; (nuestro separador de credenciales)       
+            cmp lectorEntradaFicheros[di], puntoComa
+            je  reVerificarUsuario
+            inc di         
+            jmp denegarCaracter 
         aceptarCaracter:     
-            MOV dl, 1;Será 1 cuando el caracter coincida (y permanecerá asi si todo el usuario coincide)
-            inc si
-            cmp  lectorEntradaTeclado[si], finCadena
-            je  verificarPass
-            inc di 
-            jmp verificarUsuario
-     reiniciarLectorFicheros 
+            inc si                     
+            inc di  
+            cmp  lectorEntradaTeclado[si], finCadena 
+            je  verificarCoincidenciaUsuario
+            jmp verificarUsuario 
+     verificarCoincidenciaUsuario:     
+            cmp  lectorEntradaFicheros[di], coma ; si equivale a coma es que el usuario si coincide
+            je  LecturaIngresoPass
+            jmp denegarCaracter
+     ;reiniciarLectorTeclado 
+     LecturaIngresoPass:  
+            inc di    ;su ultima posición es el separado ",", por eso se incrementa
+            xor si,si ;Se reinicia si para evaluar la cadena ingresada nuevamente
+            reiniciarLectorTeclado  
+		    imprimirEnConsola  solicitudPass          
+		    obtenerLecturaTeclado lectorEntradaTeclado
+		    cmp cl, longMaxPass ;si es == 4 se evalua, si no lo vuelve a solicitar
+		    je verificarPass
+		    ErrorEntradaPass:
+		        imprimirEnConsola passMaxError 
+		        reiniciarLectorTeclado
+		        jmp LecturaIngresoPass
+     verificarPass:           
+            MOV bl, lectorEntradaFicheros[di]
+            cmp  lectorEntradaTeclado[si], bl 
+            je aceptarCaracterPass
+            notificarPassErroneo:
+                ;dado que no coincide el pass, se niega el acceso y se solicita nuevamente un usuario   
+                xor di,di  
+                xor si,si ;Se reinicia si para evaluar la cadena ingresada nuevamente 
+                imprimirEnConsola passErroneo
+                reiniciarLectorTeclado
+                jmp  LecturaIngresoUsuario 
+            aceptarCaracterPass:     
+                inc si
+                inc di
+                cmp  lectorEntradaTeclado[si], finCadena 
+                je  verificarCoincidenciaPass
+                jmp verificarPass
+            verificarCoincidenciaPass:     
+                cmp  lectorEntradaFicheros[di], puntoComa; si equivale a punto coma es que el pass si coincide 
+                je  accesoUsuario
+                jmp notificarPassErroneo
+     usuarioInexistente:
+        imprimirEnConsola usuarioErroneo
+        reiniciarLectorTeclado
+        xor di,di ; se restablece el puntero al inicio del archivo para nuevas evaluaciones
+        jmp LecturaIngresoUsuario 
+     accesoUsuario:
+        imprimirEnConsola usuarioAccedido  
+        ;accede al juego:
+		imprimirEnConsola inicioJuego 
+		POP SI 
+		POP DI     
 endm   
        
 ;================ DEFINICIÓN DE MODELO Y PILA ==============================       
@@ -183,11 +248,15 @@ retornoCR EQU 0dh ;0dh-> 13 ->\r
 tabulador EQU 09h ;09h -> 0 -Z \t    
 EtildadaMinus EQU 82h ;82H -> 130 -> é
 ItildadaMinus EQU 0A1h ;A1H -> 161 -> í
-OtildadaMinus EQU 0A2h ;A2H -> 162 -> ó 
+OtildadaMinus EQU 0A2h ;A2H -> 162 -> ó
+coma EQU 2ch ;2ch-> 44 -> , 
+puntoComa EQU 3bh ;3bh-> 59 -> ;  
 finRutaFichero EQU 0h ;0h-> 0 -> 0 
 finCadena EQU 24h ;24h-> 36 -> $
 dimensionLectorTeclado EQU 14h 
-dimensionLectorFicheros EQU 0c8h    
+dimensionLectorFicheros EQU 0c8h 
+longMaxUsuario EQU 07h
+longMaxPass EQU 04h   
   
 ;=== INTERRUPCIONES EQUIVALENTES === 
 subFuncionVerCadena EQU 09h ;09h -> 9 -> Visualización de una cadena de caracteres
@@ -202,11 +271,12 @@ funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS
    
 ;=== VECTORES ===            
 lectorEntradaTeclado db 20 dup(finCadena); llenamos el vector de $ y agregamos un final de cadena
-lectorEntradaFicheros db 200 dup(finCadena)
-nombreArchivoJugadores db 'C:\BALLBREAKERDATA\Gamers.txt',finRutaFichero ;dosbox es 'B\Gamers.txt',finRutaFichero
-nombreArchivoPartidas db 'C:\BALLBREAKERDATA\Rounds.txt',finRutaFichero  ;dosbox es 'B\Rounds.txt',finRutaFichero
-nombreReportePuntajes db 'C:\BALLBREAKERDATA\Puntos.rep',finRutaFichero  ;dosbox es 'B\Puntos.txt',finRutaFichero
-nombreReporteTiempos db 'C:\BALLBREAKERDATA\Tiempo.rep',finRutaFichero   ;dosbox es 'B\Tiempo.txt',finRutaFichero
+lectorEntradaFicheros db 200 dup(finCadena)     
+;Rutas ejecutando desde Emu8086:
+nombreArchivoJugadores db 'C:\B\Gamers.txt',finRutaFichero ;En dosbox es 'B\Gamers.txt',finRutaFichero
+nombreArchivoPartidas db 'C:\B\Rounds.txt',finRutaFichero  ;En dosbox es 'B\Rounds.txt',finRutaFichero
+nombreReportePuntajes db 'C:\B\Puntos.rep',finRutaFichero  ;En dosbox es 'B\Puntos.txt',finRutaFichero
+nombreReporteTiempos db 'C:\B\Tiempo.rep',finRutaFichero   ;En dosbox es 'B\Tiempo.txt',finRutaFichero
 controladorFicheros dw ?      
 
 ;=== CADENAS PARA MENSAJES EN CONSOLA ===    
@@ -216,7 +286,8 @@ lineaSeparadora db saltoLn,retornoCR,'!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*
 ;===   DATOS   ===
 datosCurso db saltoLn,retornoCR, 'Universidad de San Carlos de Guatemala', saltoLn,retornoCR,'Facultad de Ingenier',ItildadaMinus,'a', saltoLn,retornoCR,'Arquitectura de Computadores y Ensambladores 1', saltoLn,retornoCR,'Segundo Semestre 2020', saltoLn,retornoCR,'Secci',OtildadaMinus,'n: A', saltoLn,retornoCR,'Proyecto 2', saltoLn,retornoCR,finCadena                                                                                 
 misDatos db saltoLn,retornoCR,tabulador,'Byron Gerardo Castillo G',OtildadaMinus,'mez',saltoLn,retornoCR,tabulador,tabulador,'20170544',finCadena
-;===   ALERTAS   === 
+;===   ALERTAS   ===  
+debug db saltoLn,retornoCR,'Punto Debug...',saltoLn,retornoCR,finCadena
 inicioJuego db saltoLn,retornoCR,'Iniciando Partida...',saltoLn,retornoCR,finCadena 
 finJuego db saltoLn,retornoCR,'fin de Partida...',saltoLn,retornoCR,finCadena       
 salidaJuego db saltoLn,retornoCR,'Saliendo del Juego...',saltoLn,retornoCR,'JUEGO TERMINADO  :)',finCadena
@@ -225,7 +296,7 @@ usuarioAccedido db saltoLn,retornoCR,'Usuario reconocido, accediendo...',saltoLn
 usuarioRegistrado db saltoLn,retornoCR,'Usuario registrado, ya puede utilizarlo para jugar',saltoLn,retornoCR,finCadena 
 usuarioErroneo db saltoLn,retornoCR,'El usuario no existe!!',saltoLn,retornoCR,finCadena
 passErroneo db saltoLn,retornoCR,'El pass es incorrecto!!',saltoLn,retornoCR,finCadena   
-usuarioMax db saltoLn,retornoCR,'El usuario ingresado sobrepasa el max(7) de caracteres',saltoLn,retornoCR,finCadena
+usuarioMaxError db saltoLn,retornoCR,'El usuario ingresado sobrepasa el max(7) de caracteres',saltoLn,retornoCR,finCadena
 passMaxError db saltoLn,retornoCR,'El pass ingresado sobrepasa el max(4) de digitos o no es del todo num',EtildadaMinus,'rico',finCadena
 velocidadErronea db saltoLn,retornoCR,'La velocidad ingresada es incorrecta',saltoLn,retornoCR,finCadena
 aperturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de abrir el fichero',saltoLn,retornoCR,finCadena
@@ -252,26 +323,16 @@ menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,r
 		    mostrarEncabezado  
 		    menuInicial:
 			    mostrarMenuPrincipal
-			    LecturaPrincipal:      
-			        MOV cl,0         
+			    LecturaPrincipal:               
 			        obtenerLecturaTeclado lectorEntradaTeclado
-			        cmp cl,1  
-			        je distribuirSubMenu
+			        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opción valida 
+			        je distribuirSubMenu ;se manda a validar la opción
 			    ErrorEntradaPrincipal:
 			        imprimirEnConsola opcionErronea
 			        jmp LecturaPrincipal
 		seccionIngreso:
 		    imprimirEnConsola menuIngreso   
-	        
-		    AccesoJuego:
-		         imprimirEnConsola usuarioAccedido 
-		         imprimirEnConsola inicioJuego 
-		         imprimirEnConsola finJuego  
-		          
-		    ;AccesoAdmin:   
-		         ;imprimirEnConsola usuarioAccedido 
-		    ;    jmp seccionTops
-		    jmp  menuInicial
+	        verificarIngreso   
 		seccionRegistro:
 		    imprimirEnConsola menuRegistro
     		    LecturaRegistroUsuario:  
