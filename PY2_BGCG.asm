@@ -20,10 +20,8 @@ mostrarEncabezado macro
     imprimirEnConsola lineaSeparadora
 endm    
 
-mostrarMenuPrincipal macro   
-    ;imprimirEnConsola lineaSeparadora 
+mostrarMenuPrincipal macro    
     imprimirEnConsola tituloJuego   
-    ;imprimirEnConsola lineaSeparadora
     imprimirEnConsola menuPrincipal
 endm              
 
@@ -93,15 +91,27 @@ reiniciarLectorFicheros macro
         inc si
         loop borrar 
     POP SI
-endm  
+endm 
+
+reiniciarEscritorFicheros macro 
+    LOCAL borrar
+    PUSH SI  
+    MOV si,0;Bits de SI en 0  
+    MOV CX, dimensionEscritorFicheros
+    borrar:
+        MOV escritorFicheroActual[si], finCadena 
+        inc si
+        loop borrar 
+    POP SI
+endm 
 
 abrirArchivo macro rutaArchivo,controlador
     mov ah,subFuncionAbrirFichero
-    mov al,00h    ;modo de acceso:
+    mov al, permisoLecturaEscritura  ;modo de acceso:
     mov dx, offset rutaArchivo
     int funcionesDOS
-    mov controlador,ax
     jc errorAperturaArchivo
+    mov controlador,ax
 endm
 
 leerArchivo macro numBytes,arregloLector,controlador
@@ -110,56 +120,81 @@ leerArchivo macro numBytes,arregloLector,controlador
     mov cx,numBytes       ;cuantos bytes se leerán
     lea dx,arregloLector
     int funcionesDOS
-    jc errorLecturaArchivo ;Se produce acarreo = 1 en una lectura fallida
+    jc errorLecturaArchivo ;Se produce acarreo = 1 en una lectura fallida 
 endm        
-
+ 
+crearArchivo macro rutaArchivo,controlador 
+    mov ah,subFuncionCrearFichero
+    mov cx,00h ; es el modo de fichero estándar (existen otros tipos)
+    lea dx,rutaArchivo
+    int funcionesDOS
+    mov controlador,ax                           
+endm  
+ 
 cerrarArchivo macro controlador 
     MOV ah, subFuncionCerrarFichero
     MOV bx, controlador
     int funcionesDOS                           
-endm                               
- 
-leerArchivoEnrutado macro indicador    
-    LOCAL asignarRutaJugadores, asignarRutaPartidas,asignarRutaAdmins, asignarRutaPuntos,asignarRutaTiempos, lectura
-    reiniciarLectorFicheros  
-    cmp indicador,0
+endm    
+
+adjuntarContenidoArchivo macro numBytes,arregloEscritor,controlador
+	;lo datos se adjuntan si el archivo ya fue leido, ya que el puntero
+	; estará en el final, para sobreescribir se debe vaciar el archivo
+	;(en algunos casos se crea nuevamente el archivo para que ya este vacio)
+	mov bx, controlador
+    MOV ah, subFuncionAdjuntarInfoFichero
+    MOV cx, numBytes
+    MOV dx, offset arregloEscritor
+    int funcionesDOS  
+endm 
+
+accionarArchivoEnrutado macro indicadorArchivo, indicadorAccion    
+    LOCAL asignarRutaJugadores, asignarRutaPartidas,asignarRutaAdmins, asignarRutaPuntos,asignarRutaTiempos, delimitador, lectura, fin
+    reiniciarLectorFicheros
+    cmp indicadorArchivo,0
     je asignarRutaJugadores
-    cmp indicador,1
+    cmp indicadorArchivo,1
     je asignarRutaPartidas
-    cmp indicador,2
+    cmp indicadorArchivo,2
     je asignarRutaPuntos
-    cmp indicador,3
+    cmp indicadorArchivo,3
     je asignarRutaTiempos
-    cmp indicador,4
+    cmp indicadorArchivo,4
     je asignarRutaAdmins
     asignarRutaJugadores:
         abrirArchivo nombreArchivoJugadores,controladorFicheros 
-        jmp lectura
+        jmp delimitador
     asignarRutaPartidas:
         abrirArchivo nombreArchivoPartidas,controladorFicheros
-        jmp lectura
+        jmp delimitador
     asignarRutaPuntos:
         abrirArchivo nombreReportePuntajes,controladorFicheros
-        jmp lectura
+        jmp delimitador
     asignarRutaAdmins:
         abrirArchivo nombreArchivoAdmins,controladorFicheros
-        jmp lectura
+        jmp delimitador
     asignarRutaTiempos:
         abrirArchivo nombreReporteTiempos,controladorFicheros     
+    delimitador:
+        cmp indicadorAccion,1 ;leerá también el archivo
+        je  lectura 
+        jmp fin
     lectura:
         leerArchivo dimensionLectorFicheros,lectorEntradaFicheros,controladorFicheros
-        imprimirEnConsola  lectorEntradaFicheros  
+        imprimirEnConsola  lectorEntradaFicheros 
+    fin: 
 endm    
 
 brindarBienvenidaAdmin macro
      imprimirEnConsola bienvenidaAdmin 
-     imprimirEnConsola lectorEntradaUsuario[0]
+     imprimirEnConsola lectorEntradaUsuario[0];imprime todo el contenido del arreglo(actualmente el username)
 endm    
 
 verificarAdmin macro    
     LOCAL reVerificarUsuario,denegarCaracter,aceptarCaracter,verificarCoincidenciaUsuario, validarPass, verificarPass,aceptarCaracterPass,verificarCoincidenciaPass,usuarioNoAdmin,usuarioAdmin
     MOV dl,4 ;indicador de archivo Admins.txt 
-    leerArchivoEnrutado dl ;se abre y lee el contenido de se archivo 
+    MOV bl,1 ;indicador de apertura y lectura archivo  
+    accionarArchivoEnrutado dl, bl ;se abre y lee el contenido de se archivo 
     cerrarArchivo controladorFicheros  
     xor si,si
     xor di,di
@@ -231,7 +266,8 @@ verificarIngreso macro
      PUSH SI 
      PUSH DI
      MOV dl, 0 ;indica que se use la ruta del archivo de indice 0 (Gamers.txt)
-     leerArchivoEnrutado dl ;se abre y lee el contenido de se archivo 
+     MOV bl, 1 ;indicador de apertura y lectura archivo 
+     accionarArchivoEnrutado dl, bl ;se abre y lee el contenido de se archivo 
      cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
      xor si, si ;inicializamos nuestros controles de indice
      xor di, di 
@@ -325,12 +361,164 @@ verificarIngreso macro
 		POP SI 
 		POP DI  
 		verificarAdmin   
-endm   
+endm 
+
+verificarRegistro macro  
+     LOCAL LecturaIngresoUsuario, ErrorEntradaUsuario, reVerificarUsuario, verificarUsuario,denegarCaracter, aceptarCaracter,usuarioExistente,LecturaIngresoPass,ErrorEntradaPass, verificarDigitos, numerico, noNumerico,registroUsuario,transferirOriginal, separarFilaNueva, transferirUsuario, separarColumna, separarColumna, transferirPass, separarRegistroNuevo, registro 
+     PUSH SI 
+     PUSH DI
+     MOV dl, 0 ;indica que se use la ruta del archivo de indice 0 (Gamers.txt)
+     MOV bl, 1 ;indicador de apertura y lectura archivo 
+     accionarArchivoEnrutado dl, bl ;se abre y lee el contenido de se archivo 
+     cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+     xor si, si ;inicializamos nuestros controles de indice
+     xor di, di 
+     LecturaIngresoUsuario:  
+        imprimirEnConsola  solicitudUsuario          
+        obtenerLecturaTeclado lectorEntradaUsuario   
+        cmp cl, longMaxUsuario ;si es <= 7 se evalua, si no lo vuelve a solicitar
+        jle verificarUsuario
+        ErrorEntradaUsuario:
+            imprimirEnConsola usuarioMaxError   
+            MOV dl, 1
+            reiniciarLectorTeclado dl; reinicia el lector de usuario
+            jmp LecturaIngresoUsuario
+     reVerificarUsuario:
+        xor si,si ;Se reinicia SI para evaluar la cadena ingresada nuevamente
+        add di, 3
+        ;dado que actualmente esta ubicado en un ";"(separador)
+        ;necesitamos el siguiente caracter para evaluar otro usuario,
+        ;pero sumamos 3 dado que es ";", "\n", y "\r" lo que separa a cada usuario   
+     verificarUsuario:     
+        cmp  lectorEntradaFicheros[di], finCadena
+        je LecturaIngresoPass 
+        ;si coincide con fin de cadena significa que ya evaluo todo
+        ;y no hay usuario registrado con ese nombre  
+        MOV bl, lectorEntradaFicheros[di] 
+        cmp  lectorEntradaUsuario[si], bl 
+        je aceptarCaracter
+        denegarCaracter:
+            ;dado que no coincide el usuario: 
+            ;se desplaza hasta encontrar ; (nuestro separador de credenciales)       
+            cmp lectorEntradaFicheros[di], puntoComa
+            je  reVerificarUsuario
+            inc di         
+            jmp denegarCaracter 
+        aceptarCaracter:     
+            inc si                     
+            inc di  
+            cmp lectorEntradaUsuario[si], finCadena 
+            je  verificarCoincidenciaUsuario
+            jmp verificarUsuario 
+     verificarCoincidenciaUsuario:     
+            cmp  lectorEntradaFicheros[di], coma
+            ; si equivale a coma es que el usuario si existe y esta en uso, no se pued registrar
+            je  usuarioExistente
+            jmp denegarCaracter 
+     usuarioExistente:
+            imprimirEnConsola usuarioEnUso 
+            MOV dl, 1
+            reiniciarLectorTeclado dl; reinicia el lector de usuario
+            jmp LecturaIngresoUsuario
+     LecturaIngresoPass:  
+            xor si,si ;Se reinicia si para evaluar la cadena ingresada nuevamente
+            MOV dl, 2
+            reiniciarLectorTeclado dl; reinicia lector de pass  
+		    imprimirEnConsola  solicitudPass          
+		    obtenerLecturaTeclado lectorEntradaPass
+		    cmp cl, longMaxPass ;si es == 4 se evalua, si no lo vuelve a solicitar
+		    je verificarDigitos
+		    ErrorEntradaPass:
+		        imprimirEnConsola passMaxError
+		        jmp LecturaIngresoPass
+		    verificarDigitos:
+		        cmp  lectorEntradaPass[si], '0' 
+                je  numerico
+		        cmp  lectorEntradaPass[si], '1' 
+                je  numerico 
+                cmp  lectorEntradaPass[si], '2' 
+                je  numerico 
+                cmp  lectorEntradaPass[si], '3' 
+                je  numerico 
+                cmp  lectorEntradaPass[si], '4' 
+                je  numerico 
+                cmp  lectorEntradaPass[si], '5' 
+                je  numerico 
+                cmp  lectorEntradaPass[si], '6' 
+                je  numerico 
+                cmp  lectorEntradaPass[si], '7' 
+                je  numerico 
+                cmp  lectorEntradaPass[si], '8' 
+                je  numerico
+                cmp  lectorEntradaPass[si], '9' 
+                je  numerico  
+                jmp noNumerico 
+             numerico:
+                inc si
+                cmp  si, longMaxPass 
+                jl  verificarDigitos
+                jmp registroUsuario
+             noNumerico:
+                imprimirEnConsola passNoNumerico
+                jmp LecturaIngresoPass   
+     registroUsuario:
+        reiniciarEscritorFicheros
+        MOV dl, 0 ;indica que se use la ruta del archivo de indice 0 (Gamers.txt)
+        MOV bl, 1 ;indicador de apertura y lectura del archivo 
+        accionarArchivoEnrutado dl, bl ;se abre el contenido de se archivo 
+        xor di, di ;Se reinicia para emplearlo como indice ubicador
+        xor si,si ;Se reinicia para emplearlo como indice ubicador
+        ;transferirOriginal:
+            ;MOV bl, lectorEntradaFicheros[di]
+            ;MOV escritorFicheroActual[si], bl 
+            ;inc si
+            ;inc di 
+            ;cmp lectorEntradaFicheros[di], finCadena
+            ;je separarFilaNueva
+           ; jmp transferirOriginal 
+        separarFilaNueva:
+            MOV escritorFicheroActual[si],retornoCR
+            inc si
+            MOV escritorFicheroActual[si],saltoLn 
+            inc si 
+            xor di, di
+        transferirUsuario:
+            MOV bl, lectorEntradaUsuario[di]
+            MOV escritorFicheroActual[si], bl 
+            inc si
+            inc di 
+            cmp lectorEntradaUsuario[di], finCadena
+            je separarColumna
+            jmp transferirUsuario 
+        separarColumna:
+            MOV escritorFicheroActual[si],coma 
+            inc si  
+            xor di,di
+        transferirPass:
+            MOV bl, lectorEntradaPass[di]
+            MOV escritorFicheroActual[si], bl 
+            inc si 
+            inc di
+            cmp lectorEntradaPass[di], finCadena
+            je separarRegistroNuevo
+            jmp transferirPass 
+        separarRegistroNuevo:
+            MOV escritorFicheroActual[si],puntoComa 
+            inc si
+            MOV cx, si;cuenta de elementos byte a adjuntar en el fichero
+            xor si,si
+            xor di,di   
+        registro:
+            adjuntarContenidoArchivo cx escritorFicheroActual controladorFicheros
+            cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+            reiniciarEscritorFicheros
+            imprimirEnConsola usuarioRegistrado 
+endm      
        
 ;================ DEFINICIÓN DE MODELO Y PILA ==============================       
 .model small ;small: Se utilizará sólo un segmento de datos con un segmento de código,
              ;en total 128 Kbytes de memoria
-.stack 100h  ;asigamos su tamaño 
+.stack 100h  ;asignamos su tamaño 
 ;================ SEGMENTO DE DATOS ============================== 
 .data   
   
@@ -338,17 +526,19 @@ endm
 saltoLn EQU 0ah ;0ah-> 10 -> \n 
 retornoCR EQU 0dh ;0dh-> 13 ->\r       
 tabulador EQU 09h ;09h -> 0 -Z \t    
-EtildadaMinus EQU 82h ;82H -> 130 -> é
+EtildadaMinus EQU 0a3h;163 82h ;82H -> 130 -> é
 ItildadaMinus EQU 0A1h ;A1H -> 161 -> í
 OtildadaMinus EQU 0A2h ;A2H -> 162 -> ó
 coma EQU 2ch ;2ch-> 44 -> , 
 puntoComa EQU 3bh ;3bh-> 59 -> ;  
 finRutaFichero EQU 0h ;0h-> 0 -> 0 
 finCadena EQU 24h ;24h-> 36 -> $
-dimensionLectorTeclado EQU 14h 
-dimensionLectorFicheros EQU 0c8h 
-longMaxUsuario EQU 07h
-longMaxPass EQU 04h   
+dimensionLectorTeclado EQU 14h; 20D 
+dimensionLectorFicheros EQU 0c8h;200D 
+dimensionEscritorFicheros EQU 0c8h;200D 
+longMaxUsuario EQU 07h;7 caracteres máximo
+longMaxPass EQU 04h;4 digitos fijos  
+permisoLecturaEscritura EQU 02h; 2 hace referencia a ese modo de acceso en ficheros 
   
 ;=== INTERRUPCIONES EQUIVALENTES === 
 subFuncionVerCadena EQU 09h ;09h -> 9 -> Visualización de una cadena de caracteres
@@ -364,8 +554,10 @@ funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS
 ;=== VECTORES ===            
 lectorEntradaTeclado db 20 dup(finCadena); llenamos el vector de $ y agregamos un final de cadena
 lectorEntradaFicheros db 200 dup(finCadena)
+escritorFicheroActual db 200 dup(finCadena);
 lectorEntradaUsuario db 20 dup(finCadena);
-lectorEntradaPass db 20 dup(finCadena);     
+lectorEntradaPass db 20 dup(finCadena);   
+  
 ;Rutas ejecutando desde Emu8086:
 nombreArchivoJugadores db 'C:\B\Gamers.txt',finRutaFichero ;En dosbox es 'B\Gamers.txt',finRutaFichero
 nombreArchivoPartidas db 'C:\B\Rounds.txt',finRutaFichero  ;En dosbox es 'B\Rounds.txt',finRutaFichero
@@ -391,7 +583,9 @@ opcionErronea db saltoLn,retornoCR,'La opci',OtildadaMinus,'n ingresada no es co
 usuarioAccedido db saltoLn,retornoCR,'Usuario reconocido, accediendo...',saltoLn,retornoCR,finCadena    
 usuarioRegistrado db saltoLn,retornoCR,'Usuario registrado, ya puede utilizarlo para jugar',saltoLn,retornoCR,finCadena 
 usuarioErroneo db saltoLn,retornoCR,'El usuario no existe!!',saltoLn,retornoCR,finCadena
-passErroneo db saltoLn,retornoCR,'El pass es incorrecto!!',saltoLn,retornoCR,finCadena   
+usuarioEnUso db saltoLn,retornoCR,'El usuario ya existe, elija uno nuevo!!',saltoLn,retornoCR,finCadena
+passErroneo db saltoLn,retornoCR,'El pass es incorrecto!!',saltoLn,retornoCR,finCadena 
+passNoNumerico db saltoLn,retornoCR,'El pass no es del todo numérico!!',saltoLn,retornoCR,finCadena  
 usuarioMaxError db saltoLn,retornoCR,'El usuario ingresado sobrepasa el max(7) de caracteres',saltoLn,retornoCR,finCadena
 passMaxError db saltoLn,retornoCR,'El pass ingresado sobrepasa el max(4) de digitos o no es del todo num',EtildadaMinus,'rico',finCadena
 velocidadErronea db saltoLn,retornoCR,'La velocidad ingresada es incorrecta',saltoLn,retornoCR,finCadena
@@ -430,9 +624,8 @@ menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,r
 		    imprimirEnConsola menuIngreso   
 	        verificarIngreso   
 		seccionRegistro:
-		    imprimirEnConsola menuRegistro
-			    RegistroExitoso: 
-			         imprimirEnConsola usuarioRegistrado
+		    imprimirEnConsola menuRegistro 
+		    verificarRegistro
 		    jmp  menuInicial 
 		seccionTops:
 		    imprimirEnConsola menuTops 
