@@ -125,7 +125,7 @@ endm
  
 crearArchivo macro rutaArchivo,controlador 
     mov ah,subFuncionCrearFichero
-    mov cx,00h ; es el modo de fichero estándar (existen otros tipos)
+    mov cx,modoEstandar ; es el modo de fichero estándar (existen otros tipos)
     lea dx,rutaArchivo
     int funcionesDOS
     mov controlador,ax                           
@@ -525,8 +525,8 @@ endm
 ;=== EQUIVALENTES ===     
 saltoLn EQU 0ah ;0ah-> 10 -> \n 
 retornoCR EQU 0dh ;0dh-> 13 ->\r       
-tabulador EQU 09h ;09h -> 0 -Z \t    
-EtildadaMinus EQU 0a3h;163 82h ;82H -> 130 -> é
+tabulador EQU 09h ;09h -> 9 -> \t    
+EtildadaMinus EQU 82h ;82H -> 130 -> é
 ItildadaMinus EQU 0A1h ;A1H -> 161 -> í
 OtildadaMinus EQU 0A2h ;A2H -> 162 -> ó
 coma EQU 2ch ;2ch-> 44 -> , 
@@ -539,16 +539,17 @@ dimensionEscritorFicheros EQU 0c8h;200D
 longMaxUsuario EQU 07h;7 caracteres máximo
 longMaxPass EQU 04h;4 digitos fijos  
 permisoLecturaEscritura EQU 02h; 2 hace referencia a ese modo de acceso en ficheros 
+modoEstandar EQU 00h; 0 hace referencia a ese modo o tipo estándar en ficheros 
   
 ;=== INTERRUPCIONES EQUIVALENTES === 
-subFuncionVerCadena EQU 09h ;09h -> 9 -> Visualización de una cadena de caracteres
-subFuncionLeerCaracter EQU 01h ;01h -> 1 -> Entrada de caracter con salida  
-subFuncionFinPrograma EQU 4ch ;4ch -> 76 -> Terminación de Programa con Código de Retorno  
-subFuncionAbrirFichero EQU 3dh ;3dh -> 61 -> Abrir Fichero 
-subFuncionLeerFichero EQU 3fh ;3fh -> 63 -> Lectura de Fichero o dispositivo 
-subFuncionCrearFichero EQU 3ch ;3ch -> 60 -> Crear Fichero 
+subFuncionLeerCaracter EQU 01h ;01h -> 1 -> Entrada de caracter con salida
+subFuncionVerCadena EQU 09h ;09h -> 9 -> Visualización de una cadena de caracteres   
+subFuncionCrearFichero EQU 3ch ;3ch -> 60 -> Crear Fichero
+subFuncionAbrirFichero EQU 3dh ;3dh -> 61 -> Abrir Fichero  
 subFuncionCerrarFichero EQU 3eh; 3eh-> 62 -> Cerrar Archivo
+subFuncionLeerFichero EQU 3fh ;3fh -> 63 -> Lectura de Fichero o dispositivo
 subFuncionAdjuntarInfoFichero EQU 40h ;40h -> 64 -> Escritura(Adjuntada) en Fichero o dispositivo.
+subFuncionFinPrograma EQU 4ch ;4ch -> 76 -> Terminación de Programa con Código de Retorno 
 funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS  
    
 ;=== VECTORES ===            
@@ -587,7 +588,7 @@ usuarioEnUso db saltoLn,retornoCR,'El usuario ya existe, elija uno nuevo!!',salt
 passErroneo db saltoLn,retornoCR,'El pass es incorrecto!!',saltoLn,retornoCR,finCadena 
 passNoNumerico db saltoLn,retornoCR,'El pass no es del todo numérico!!',saltoLn,retornoCR,finCadena  
 usuarioMaxError db saltoLn,retornoCR,'El usuario ingresado sobrepasa el max(7) de caracteres',saltoLn,retornoCR,finCadena
-passMaxError db saltoLn,retornoCR,'El pass ingresado sobrepasa el max(4) de digitos o no es del todo num',EtildadaMinus,'rico',finCadena
+passMaxError db saltoLn,retornoCR,'El pass ingresado sobrepasa el max(4) de digitos o no es del todo numerico',finCadena
 velocidadErronea db saltoLn,retornoCR,'La velocidad ingresada es incorrecta',saltoLn,retornoCR,finCadena
 aperturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de abrir el fichero',saltoLn,retornoCR,finCadena
 lecturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de leer el fichero',saltoLn,retornoCR,finCadena 
@@ -596,12 +597,30 @@ solicitudUsuario db saltoLn,retornoCR,'Ingrese el usuario:',saltoLn,retornoCR,fi
 solicitudPass db saltoLn,retornoCR,'Ingrese el Pass:',saltoLn,retornoCR,finCadena
 solicitudVelocidad db saltoLn,retornoCR,'Ingrese la velocidad(0-9):',saltoLn,retornoCR,finCadena 
 ;=== MENUS DE SELECCIÓN ===
-menuPrincipal db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU PRINCIPAL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR,'(1)->Ingresar al Juego.',saltoLn,retornoCR,  '(2)->Registrar Usuario.',saltoLn,retornoCR,'(3)->Salir del Juego.',saltoLn,retornoCR,saltoLn,'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
+menuPrincipal db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU PRINCIPAL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
+              db '(1)->Ingresar al Juego.',saltoLn,retornoCR
+              db '(2)->Registrar Usuario.',saltoLn,retornoCR
+              db '(3)->Salir del Juego.',saltoLn,retornoCR,saltoLn
+              db 'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
+              
 menuIngreso db saltoLn,retornoCR,'!#!#!#!#!#!#! INGRESO: !#!#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
 menuRegistro db saltoLn,retornoCR,'!#!#!#!#!#!#! REGISTRO: !#!#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
-menuTops db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU TOPS !#!#!#!#!#!#!#!#!',saltoLn,retornoCR,'(1)->Ver Top 10 Puntajes.',saltoLn,retornoCR,'(2)->Ver Top 10 Tiempos.',saltoLn,retornoCR,'(3)->Regresar.',saltoLn,retornoCR,saltoLn,'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
-menuOrdenamientos db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDENAMIENTOSL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR,'(1)->Bubble Sort.',saltoLn,retornoCR,'(2)->Quick Sort.',saltoLn,retornoCR,'(3)->Shell Sort.',saltoLn,retornoCR,saltoLn,'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
-menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,retornoCR,'(1)->Ascendente.',saltoLn,retornoCR,'(2)->Descendente.',saltoLn,retornoCR,'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
+menuTops db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU TOPS !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
+         db '(1)->Ver Top 10 Puntajes.',saltoLn,retornoCR
+         db '(2)->Ver Top 10 Tiempos.',saltoLn,retornoCR
+         db '(3)->Regresar.',saltoLn,retornoCR,saltoLn
+         db 'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
+         
+menuOrdenamientos db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDENAMIENTOSL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
+                  db '(1)->Bubble Sort.',saltoLn,retornoCR
+                  db '(2)->Quick Sort.',saltoLn,retornoCR
+                  db '(3)->Shell Sort.',saltoLn,retornoCR,saltoLn
+                  db 'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena     
+                  
+menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,retornoCR 
+                  db '(1)->Ascendente.',saltoLn,retornoCR
+                  db '(2)->Descendente.',saltoLn,retornoCR
+                  db 'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
 
 ;================== SEGMENTO DE CODIGO ===========================
 .code 
