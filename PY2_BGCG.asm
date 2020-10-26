@@ -364,16 +364,8 @@ verificarIngreso macro
 endm 
 
 verificarRegistro macro  
-     LOCAL LecturaIngresoUsuario, ErrorEntradaUsuario, reVerificarUsuario, verificarUsuario,denegarCaracter, aceptarCaracter,usuarioExistente,LecturaIngresoPass,ErrorEntradaPass, verificarDigitos, numerico, noNumerico,registroUsuario,transferirOriginal, separarFilaNueva, transferirUsuario, separarColumna, separarColumna, transferirPass, separarRegistroNuevo, registro 
-     PUSH SI 
-     PUSH DI
-     MOV dl, 0 ;indica que se use la ruta del archivo de indice 0 (Gamers.txt)
-     MOV bl, 1 ;indicador de apertura y lectura archivo 
-     accionarArchivoEnrutado dl, bl ;se abre y lee el contenido de se archivo 
-     cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
-     xor si, si ;inicializamos nuestros controles de indice
-     xor di, di 
-     LecturaIngresoUsuario:  
+     LOCAL LecturaIngresoUsuario, ErrorEntradaUsuario, reVerificarUsuario, verificarUsuario,denegarCaracter, aceptarCaracter,usuarioExistente,LecturaIngresoPass,ErrorEntradaPass, verificarDigitos, numerico, noNumerico,registroUsuario,transferirOriginal, separarFilaNueva, transferirUsuario, separarColumna, separarColumna, transferirPass, separarRegistroNuevo, registro  
+     LecturaIngresoUsuario:   
         imprimirEnConsola  solicitudUsuario          
         obtenerLecturaTeclado lectorEntradaUsuario   
         cmp cl, longMaxUsuario ;si es <= 7 se evalua, si no lo vuelve a solicitar
@@ -513,7 +505,172 @@ verificarRegistro macro
             cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
             reiniciarEscritorFicheros
             imprimirEnConsola usuarioRegistrado 
-endm      
+endm 
+
+imprimirTop macro indicadorTitulo
+     LOCAL topPuntajes, topTiempos, fin
+     mostrarEncabezado
+     cmp indicadorTitulo, 0
+     je  topPuntajes
+     cmp indicadorTitulo, 1
+     je  topTiempos
+     topPuntajes:
+        imprimirEnConsola tituloTopPuntajes
+        jmp fin
+     topTiempos:
+         imprimirEnConsola tituloTopTiempos
+        jmp fin
+     fin:
+        imprimirEnConsola escritorFicheroActual[0]       
+endm    
+
+accionarTopResultados macro indicadorAccion
+     LOCAL elegirElementos, mostrarTopPuntajes, mostrarTopTiempos, generarTopPuntajes, generarTopTiempos, Fin
+     elegirElementos:                                       
+        cmp indicadorAccion, 0 ;mostrar Top Puntajes consola  
+        je  mostrarTopPuntajes
+        cmp indicadorAccion, 1 ;mostrar Top Tiempos consola
+        je  mostrarTopTiempos
+        cmp indicadorAccion, 2 ;generar Fichero Top Puntajes 
+        je  generarTopPuntajes
+        cmp indicadorAccion, 3 ;generar Fichero Top Tiempos 
+        je  generarTopTiempos
+     mostrarTopPuntajes:
+        MOV bh, 0
+        obtenerDataTop bh 
+        imprimirTop bh 
+        jmp generarTopPuntajes
+     mostrarTopTiempos:
+        MOV bh, 1
+        obtenerDataTop bh
+        imprimirTop bh
+        jmp generarTopTiempos
+     generarTopPuntajes: 
+        
+        jmp Fin
+     generarTopTiempos:
+        ;sobreEscribirTopTiempos
+        jmp Fin
+     Fin:
+        reiniciarEscritorFicheros                      
+endm 
+
+obtenerDataTop macro indicadorElemento
+    LOCAL verificarFin, asignarPuesto, obtenerUsername,separarUsuario,desplazarAFin,readecuarDestino, obtenerNivel,separarNivel,obtenerPuntaje,separarFila,obtenerTiempo,desplazarATiempo,obtenerDato,elegirElemento, finalizado,sobrepasarSeparador, reconocerSalto, desplazarSalto           
+    PUSH SI
+    PUSH DI 
+    PUSH Bx ;Dado que para pasar el parámetro usamos bh pero este registro
+    ;puede alterarse con la apertura y lectura del archivo entonces se hace un push 
+    MOV dl, 1 ;indica que se use la ruta del archivo de indice 1 (Rounds.txt)
+    MOV bl, 1 ;indicador de apertura y lectura archivo 
+    accionarArchivoEnrutado dl, bl ;se abre y lee el contenido de se archivo 
+    cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+    POP Bx ;con el pop recuperamso el valor de la pila que se metió previamente
+    xor si, si;inicializamos nuestros controles de indice
+    xor di, di
+    xor cl, 0 
+    xor ch,0; 
+    ;Dado que en el archivo ya están ordenados los elementos entonces solo se incrementa
+    ;el contador como representación del puesto en el top
+    verificarFin:
+      cmp  lectorEntradaFicheros[di], finCadena
+      je finalizado
+      cmp  cl, 10 ; 10 dado que es top 10
+      je finalizado 
+    asignarPuesto:
+       MOV escritorFicheroActual[si], punto
+       inc si
+       MOV escritorFicheroActual[si], punto
+       inc si
+    obtenerUsername:
+       MOV bl, lectorEntradaFicheros[di]
+       MOV escritorFicheroActual[si], bl 
+       inc si
+       inc di
+       cmp lectorEntradaFicheros[di], coma
+       je  separarUsuario
+       jmp obtenerUsername
+    separarUsuario:; agrega espacios como separación   
+       MOV escritorFicheroActual[si], espacio
+       inc si
+       inc ch
+       cmp ch, 15
+       jl  separarUsuario
+       xor ch, ch
+       inc di
+    obtenerNivel: 
+       MOV bl, lectorEntradaFicheros[di]
+       MOV escritorFicheroActual[si], bl 
+       inc si
+       inc di
+       cmp lectorEntradaFicheros[di], coma
+       je  separarNivel
+       jmp obtenerNivel
+    separarNivel:; agrega espacios como separación entre los datos   
+       MOV escritorFicheroActual[si], espacio
+       inc si
+       inc ch
+       cmp ch, 15
+       jl  separarNivel
+       xor ch, ch
+       inc di
+    elegirElemento:;se emplea bh ya que el tiene actualmente guardado ese valor
+       cmp  bh, 0
+       je   obtenerPuntaje
+       cmp  bh, 1
+       je  readecuarDestino 
+    obtenerPuntaje:
+       ;inc di    
+       MOV bl, lectorEntradaFicheros[di]
+       MOV escritorFicheroActual[si], bl 
+       inc si
+       inc di
+       cmp lectorEntradaFicheros[di], coma
+       je  desplazarAFin
+       jmp obtenerPuntaje
+    desplazarAFin:; se desplaza sobre los datos hasta llegar al ";" que delimita el fin
+       cmp lectorEntradaFicheros[di], puntoComa
+       je separarFila
+       inc di
+       jmp desplazarAFin    
+    separarFila: 
+       MOV escritorFicheroActual[si],retornoCR
+       inc si
+       MOV escritorFicheroActual[si],saltoLn 
+       inc si
+       inc cl; ya se obtuvo la data de un usuario, se incrementa su cuenta
+    reconocerSalto: 
+        inc di
+        cmp lectorEntradaFicheros[di], retornoCR
+        je desplazarSalto
+        jmp verificarFin
+    desplazarSalto:
+        add di, 2
+        jmp verificarFin
+    readecuarDestino:
+        inc di        
+    desplazarATiempo:; Se desplaza sobre los datos hasta llegar a la info del tiempo 
+       cmp lectorEntradaFicheros[di], coma
+       je sobrepasarSeparador
+       jmp readecuarDestino 
+    sobrepasarSeparador:
+       inc di    
+    obtenerDato:
+       MOV bl, lectorEntradaFicheros[di]
+       MOV escritorFicheroActual[si], bl 
+       inc si
+       inc di
+       cmp lectorEntradaFicheros[di], puntoComa
+       je  separarFila
+       jmp obtenerDato          
+    finalizado:
+       xor cx, cx 
+       xor si, si
+       xor di, di
+       POP SI
+       POP DI   
+endm    
+     
        
 ;================ DEFINICIÓN DE MODELO Y PILA ==============================       
 .model small ;small: Se utilizará sólo un segmento de datos con un segmento de código,
@@ -530,7 +687,9 @@ EtildadaMinus EQU 82h ;82H -> 130 -> é
 ItildadaMinus EQU 0A1h ;A1H -> 161 -> í
 OtildadaMinus EQU 0A2h ;A2H -> 162 -> ó
 coma EQU 2ch ;2ch-> 44 -> , 
-puntoComa EQU 3bh ;3bh-> 59 -> ;  
+punto EQU 2eh ;2eh-> 46 -> ,  
+puntoComa EQU 3bh ;3bh-> 59 -> ;
+espacio EQU 20h;20h->32 -> espacio en blanco  
 finRutaFichero EQU 0h ;0h-> 0 -> 0 
 finCadena EQU 24h ;24h-> 36 -> $
 dimensionLectorTeclado EQU 14h; 20D 
@@ -588,10 +747,12 @@ usuarioEnUso db saltoLn,retornoCR,'El usuario ya existe, elija uno nuevo!!',salt
 passErroneo db saltoLn,retornoCR,'El pass es incorrecto!!',saltoLn,retornoCR,finCadena 
 passNoNumerico db saltoLn,retornoCR,'El pass no es del todo numérico!!',saltoLn,retornoCR,finCadena  
 usuarioMaxError db saltoLn,retornoCR,'El usuario ingresado sobrepasa el max(7) de caracteres',saltoLn,retornoCR,finCadena
-passMaxError db saltoLn,retornoCR,'El pass ingresado sobrepasa el max(4) de digitos o no es del todo numerico',finCadena
+passMaxError db saltoLn,retornoCR,'El pass ingresado sobr0epasa el max(4) de digitos o no es del todo numerico',finCadena
 velocidadErronea db saltoLn,retornoCR,'La velocidad ingresada es incorrecta',saltoLn,retornoCR,finCadena
 aperturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de abrir el fichero',saltoLn,retornoCR,finCadena
 lecturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de leer el fichero',saltoLn,retornoCR,finCadena 
+tituloTopPuntajes db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 PUNTAJES !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
+tituloTopTiempos db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 TIEMPOS !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
 ;=== SOLICITUDES ===    
 solicitudUsuario db saltoLn,retornoCR,'Ingrese el usuario:',saltoLn,retornoCR,finCadena   
 solicitudPass db saltoLn,retornoCR,'Ingrese el Pass:',saltoLn,retornoCR,finCadena
@@ -627,9 +788,14 @@ menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,r
     asignarDIreccionDatos:
        MOV dx,@data ; Dirección del segmento de datos
 	   MOV ds,dx 
-	main proc
+	main proc 
+	        MOV bl, 1
+		    accionarTopResultados bl
+		    MOV bl, 0
+		    accionarTopResultados bl 
 		IniciarPrograma:
-		    mostrarEncabezado  
+		    mostrarEncabezado
+		     
 		    menuInicial:
 			    mostrarMenuPrincipal
 			    LecturaPrincipal:               
@@ -641,10 +807,10 @@ menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,r
 			        jmp LecturaPrincipal
 		seccionIngreso:
 		    imprimirEnConsola menuIngreso   
-	        verificarIngreso   
+	        ;verificarIngreso   
 		seccionRegistro:
 		    imprimirEnConsola menuRegistro 
-		    verificarRegistro
+		    ;verificarRegistro
 		    jmp  menuInicial 
 		seccionTops:
 		    imprimirEnConsola menuTops 
