@@ -126,7 +126,7 @@ endm
 crearArchivo macro rutaArchivo,controlador 
     mov ah,subFuncionCrearFichero
     mov cx,modoEstandar ; es el modo de fichero estándar (existen otros tipos)
-    lea dx,rutaArchivo
+    mov dx, offset rutaArchivo
     int funcionesDOS
     mov controlador,ax                           
 endm  
@@ -534,6 +534,28 @@ verificarRegistro macro
             imprimirEnConsola usuarioRegistrado 
 endm 
 
+adjuntarEncabezadoTopPuntajes macro
+    ;las dimensiones de la cadena  del encabezado serán fijas
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+    adjuntarContenidoArchivo 161,datosCurso,controladorFicheros
+    adjuntarContenidoArchivo 43,misDatos,controladorFicheros
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+    adjuntarContenidoArchivo 51,tituloTopPuntajes,controladorFicheros
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+endm
+
+adjuntarEncabezadoTopTiempos macro
+    ;las dimensiones de la cadena  del encabezado serán fijas
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+    adjuntarContenidoArchivo 161,datosCurso,controladorFicheros
+    adjuntarContenidoArchivo 43,misDatos,controladorFicheros
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+    adjuntarContenidoArchivo 50,tituloTopTiempos,controladorFicheros
+    adjuntarContenidoArchivo 50,lineaSeparadora,controladorFicheros
+endm
+
 direccionarTop macro ;incrementa o decrece si es ascendente o descendente
     LOCAL ascender, descender, fin
       cmp al, 1
@@ -546,7 +568,7 @@ direccionarTop macro ;incrementa o decrece si es ascendente o descendente
       fin:
 endm 
 
-establecerPuntoInicial macro ;establece el punto incial (del puesto en los tops)
+establecerLimitesRango macro ;establece el punto inicial y final (del puesto en los tops)
      LOCAL inicioBajo, inicioAlto, fin
       cmp al, 1
       je inicioAlto
@@ -561,9 +583,37 @@ establecerPuntoInicial macro ;establece el punto incial (del puesto en los tops)
          MOV cl,DS:[Orientador.puntoInicialTop]
 endm
 
+reportarPuntajesEnFichero macro
+    PUSH CX
+    crearArchivo nombreReportePuntajes,controladorFicheros
+    cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+    MOV dl, 2 ;indica que se use la ruta del archivo de indice 2 (Puntos.rep)
+    MOV bl, 1 ;indicador de apertura y lectura del archivo 
+    accionarArchivoEnrutado dl, bl ;se abre el contenido de se archivo
+    adjuntarEncabezadoTopPuntajes
+    POP CX
+    adjuntarContenidoArchivo cx,escritorFicheroActual,controladorFicheros;cx posee el num de bytes para el archivo
+    cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+    xor cx, cx
+endm
+
+reportarTiemposEnFichero macro
+    PUSH CX
+    crearArchivo nombreReporteTiempos,controladorFicheros
+    cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+    MOV dl, 3 ;indica que se use la ruta del archivo de indice 3 (Tiempos.rep)
+    MOV bl, 1 ;indicador de apertura y lectura del archivo 
+    accionarArchivoEnrutado dl, bl ;se abre el contenido de se archivo
+    adjuntarEncabezadoTopTiempos
+    POP CX
+    adjuntarContenidoArchivo cx,escritorFicheroActual,controladorFicheros;cx posee el num de bytes para el archivo
+    cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+    xor cx, cx
+endm
+
 imprimirTop macro indicadorTitulo
      LOCAL topPuntajes, topTiempos, fin
-     ;mostrarEncabezado
+     mostrarEncabezado
      cmp indicadorTitulo, 0
      je  topPuntajes
      cmp indicadorTitulo, 1
@@ -601,14 +651,14 @@ accionarTopResultados macro indicadorAccion, indicadorOrden
         obtenerDataTop bh
         imprimirTop bh
         jmp generarTopTiempos
-     generarTopPuntajes: 
-        
+     generarTopPuntajes:
+        reportarPuntajesEnFichero 
         jmp Fin
      generarTopTiempos:
-        ;sobreEscribirTopTiempos
+        reportarTiemposEnFichero
         jmp Fin
      Fin:
-        reiniciarEscritorFicheros                      
+        reiniciarEscritorFicheros                    
 endm 
 
 obtenerDataTop macro indicadorElemento
@@ -630,13 +680,13 @@ obtenerDataTop macro indicadorElemento
     xor di, di
     xor cl, cl;reestablecemos a 0 nuestro contadores
     xor ch, ch;
-    establecerPuntoInicial
+    establecerLimitesRango
     ;Establece para CL el inicio y el fin (dado que sirve para asendentes y descendentes) 
     ;Basándonos en el top 10
     verificarFin:
       cmp  lectorEntradaFicheros[di], finCadena
       je finalizado
-      cmp  cl, DS:[Orientador.puntoFinalTop] ; el fin se establecio en "establecerPuntoInicial"
+      cmp  cl, DS:[Orientador.puntoFinalTop] ; el fin se establecio en "establecerLimitesRango"
       je finalizado 
     asignarPuesto:
        MOV escritorFicheroActual[si], cl
@@ -727,7 +777,7 @@ obtenerDataTop macro indicadorElemento
        je  separarFila
        jmp obtenerDato          
     finalizado:
-       xor cx, cx 
+       MOV cx, si; para saber cuantos elementos/bytes se debrán agregar al archivo 
        xor si, si
        xor di, di
        POP SI
@@ -794,8 +844,8 @@ controladorFicheros dw ?
 
 ;=== CADENAS PARA MENSAJES EN CONSOLA ===    
 ;=== SEPARADORES ===                                      
-tituloJuego db saltoLn,retornoCR,'!@!@!@!@!@!@! ASM BALL BREAKER !@!@!@!@!@!@!@!@!',saltoLn,finCadena 
-lineaSeparadora db saltoLn,retornoCR,'!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!',saltoLn,finCadena  
+tituloJuego db saltoLn,retornoCR,'!@!@!@!@!@!@! ASM BALL BREAKER !@!@!@!@!@!@!@!@!',saltoLn,retornoCR,finCadena 
+lineaSeparadora db saltoLn,retornoCR,'!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!',saltoLn,retornoCR,finCadena  
 
 ;===   DATOS   ===
 datosCurso db saltoLn,retornoCR, 'Universidad de San Carlos de Guatemala', saltoLn,retornoCR,'Facultad de Ingenier',ItildadaMinus,'a', saltoLn,retornoCR,'Arquitectura de Computadores y Ensambladores 1', saltoLn,retornoCR,'Segundo Semestre 2020', saltoLn,retornoCR,'Secci',OtildadaMinus,'n: A', saltoLn,retornoCR,'Proyecto 2', saltoLn,retornoCR,finCadena                                                                                 
@@ -827,7 +877,7 @@ solicitudUsuario db saltoLn,retornoCR,'Ingrese el usuario:',saltoLn,retornoCR,fi
 solicitudPass db saltoLn,retornoCR,'Ingrese el Pass:',saltoLn,retornoCR,finCadena
 solicitudVelocidad db saltoLn,retornoCR,'Ingrese la velocidad(0-9):',saltoLn,retornoCR,finCadena 
 
-;=== MENUS DE SELECCI�N ===
+;=== MENUS DE SELECCIÓN ===
 menuPrincipal db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU PRINCIPAL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
               db '(1)->Ingresar al Juego.',saltoLn,retornoCR
               db '(2)->Registrar Usuario.',saltoLn,retornoCR
@@ -857,6 +907,7 @@ menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,r
 Orientador STRUC
    puntoInicialTop db ?
    puntoFinalTop db ?
+   rutaReporte db ?
 Orientador ENDS  
 
 ;orientacionGeneral Orientador <0030h, 0039h>
@@ -871,7 +922,7 @@ Orientador ENDS
         accionarReporteTiemposAscendentes
         accionarReportePuntajesDescendentes
         accionarReporteTiemposDescendentes   
-		IniciarPrograma:
+	    IniciarPrograma:
 		    mostrarEncabezado
 		    menuInicial:
 			    mostrarMenuPrincipal
