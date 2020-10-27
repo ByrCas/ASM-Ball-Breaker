@@ -1,1 +1,14 @@
-nombre,nivel,puntos,tiempo
+arqui,3,90,230;
+lorem,1,40,110;
+Byron,1,90,20;
+asm,2,65,80;
+ipsum,3,125,100;
+flume,1,25,112;
+selkhat,3,325,93;
+simkhat,2,55,65;
+crissis,3,425,90;
+kobra,2,205,75;
+ipsum,3,125,100;
+lotso,1,105,95;
+tahuite,3,125,125;
+chrome,3,175,112;

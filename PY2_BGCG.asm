@@ -1,5 +1,5 @@
 
-;================ SECCIÓN DE MACROS ============================== 
+;================ SECCIÃ“N DE MACROS ============================== 
 salirPrograma macro          
     imprimirEnConsola salidaJuego
     MOV ah,subFuncionFinPrograma 
@@ -8,8 +8,8 @@ endm
 
 
 imprimirEnConsola macro cadena
-    MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
-    MOV dx,offset cadena ;proporcionamos la dirección de desplazamiento
+    MOV ah,subFuncionVerCadena; asignamos la subfunciÃ³n de la interupciÃ³n
+    MOV dx,offset cadena ;proporcionamos la direcciÃ³n de desplazamiento
     int funcionesDOS
 endm   
 
@@ -42,7 +42,7 @@ obtenerLecturaTeclado macro arregloLector
         je  finalizar
         mov arregloLector[si],al
         inc si
-        inc cl ;llevará la cuenta de caracteres ingresados
+        inc cl ;llevarÃ¡ la cuenta de caracteres ingresados
         jmp leerTecla
     finalizar:
         mov arregloLector[si],finCadena
@@ -63,19 +63,19 @@ reiniciarLectorTeclado macro indicador
     borrarTecladoGeneral:
         MOV lectorEntradaTeclado[si], finCadena 
         inc si
-        cmp si, 14h;tamaño lector
+        cmp si, 14h;tamaÃ±o lector
         jl borrarTecladoGeneral 
         jmp Fin
     borrarTecladoUsuario:
         MOV lectorEntradaUsuario[si], finCadena 
         inc si
-        cmp si, 14h  ;tamaño lector
+        cmp si, 14h  ;tamaÃ±o lector
         jl borrarTecladoUsuario   
         jmp Fin
     borrarTecladoPass:
         MOV lectorEntradaPass[si], finCadena 
         inc si
-        cmp si, 14h;tamaño lector
+        cmp si, 14h;tamaÃ±o lector
         jl borrarTecladoPass 
     Fin:    
         POP SI
@@ -117,7 +117,7 @@ endm
 leerArchivo macro numBytes,arregloLector,controlador
     mov ah,subFuncionLeerFichero
     mov bx,controlador
-    mov cx,numBytes       ;cuantos bytes se leerán
+    mov cx,numBytes       ;cuantos bytes se leerÃ¡n
     lea dx,arregloLector
     int funcionesDOS
     jc errorLecturaArchivo ;Se produce acarreo = 1 en una lectura fallida 
@@ -125,7 +125,7 @@ endm
  
 crearArchivo macro rutaArchivo,controlador 
     mov ah,subFuncionCrearFichero
-    mov cx,modoEstandar ; es el modo de fichero estándar (existen otros tipos)
+    mov cx,modoEstandar ; es el modo de fichero estÃ¡ndar (existen otros tipos)
     lea dx,rutaArchivo
     int funcionesDOS
     mov controlador,ax                           
@@ -139,7 +139,7 @@ endm
 
 adjuntarContenidoArchivo macro numBytes,arregloEscritor,controlador
 	;lo datos se adjuntan si el archivo ya fue leido, ya que el puntero
-	; estará en el final, para sobreescribir se debe vaciar el archivo
+	; estarÃ¡ en el final, para sobreescribir se debe vaciar el archivo
 	;(en algunos casos se crea nuevamente el archivo para que ya este vacio)
 	mov bx, controlador
     MOV ah, subFuncionAdjuntarInfoFichero
@@ -176,12 +176,12 @@ accionarArchivoEnrutado macro indicadorArchivo, indicadorAccion
     asignarRutaTiempos:
         abrirArchivo nombreReporteTiempos,controladorFicheros     
     delimitador:
-        cmp indicadorAccion,1 ;leerá también el archivo
+        cmp indicadorAccion,1 ;leerÃ¡ tambiÃ©n el archivo
         je  lectura 
         jmp fin
     lectura:
         leerArchivo dimensionLectorFicheros,lectorEntradaFicheros,controladorFicheros
-        imprimirEnConsola  lectorEntradaFicheros 
+        ;imprimirEnConsola  lectorEntradaFicheros 
     fin: 
 endm    
 
@@ -189,6 +189,33 @@ brindarBienvenidaAdmin macro
      imprimirEnConsola bienvenidaAdmin 
      imprimirEnConsola lectorEntradaUsuario[0];imprime todo el contenido del arreglo(actualmente el username)
 endm    
+
+;Los valores que se pasan a las macros "accionar resultados"
+;determinan el orden(asc/desc) y si es reporte de tiempos o de puntajes
+accionarReportePuntajesAscendentes macro
+    MOV bl, 0 ;puntajes ascen
+    MOV ah, 0 
+    accionarTopResultados bl, ah
+endm 
+
+accionarReporteTiemposAscendentes macro
+    MOV bl, 1 ;tiempos ascen
+    MOV ah, 0 
+    accionarTopResultados bl, ah
+endm 
+
+accionarReportePuntajesDescendentes macro
+    MOV bl, 0  ;puntajes desc
+    MOV ah, 1 
+    accionarTopResultados bl, ah
+endm 
+
+accionarReporteTiemposDescendentes macro
+    MOV bl, 1  ;tiempos desc
+    MOV ah, 1
+    accionarTopResultados bl, ah
+endm 
+
 
 verificarAdmin macro    
     LOCAL reVerificarUsuario,denegarCaracter,aceptarCaracter,verificarCoincidenciaUsuario, validarPass, verificarPass,aceptarCaracterPass,verificarCoincidenciaPass,usuarioNoAdmin,usuarioAdmin
@@ -249,7 +276,7 @@ verificarAdmin macro
                 je  usuarioAdmin
                 jmp usuarioNoAdmin
      usuarioNoAdmin:
-        ;Al no ser admin automáticamente se irá a al juego por ser un jugador estándar
+        ;Al no ser admin automÃ¡ticamente se irÃ¡ a al juego por ser un jugador estÃ¡ndar
         ;accede al juego: 
         MOV dl, 2
         reiniciarLectorTeclado dl; reinicia lector de pass  
@@ -313,7 +340,7 @@ verificarIngreso macro
             je  LecturaIngresoPass
             jmp denegarCaracter 
      LecturaIngresoPass:  
-            inc di    ;su ultima posición es el separado ",", por eso se incrementa
+            inc di    ;su ultima posiciÃ³n es el separado ",", por eso se incrementa
             xor si,si ;Se reinicia si para evaluar la cadena ingresada nuevamente
             MOV dl, 2
             reiniciarLectorTeclado dl; reinicia lector de pass  
@@ -507,9 +534,36 @@ verificarRegistro macro
             imprimirEnConsola usuarioRegistrado 
 endm 
 
+direccionarTop macro ;incrementa o decrece si es ascendente o descendente
+    LOCAL ascender, descender, fin
+      cmp al, 1
+      je descender
+      ascender:
+         inc cl
+         jmp fin
+      descender:
+         dec cl
+      fin:
+endm 
+
+establecerPuntoInicial macro ;establece el punto incial (del puesto en los tops)
+     LOCAL inicioBajo, inicioAlto, fin
+      cmp al, 1
+      je inicioAlto
+      inicioBajo:
+         MOV DS:[Orientador.puntoInicialTop],inicioAsciiDigito 
+         MOV DS:[Orientador.puntoFinalTop],finAsciiDigito   
+         jmp fin
+      inicioAlto:
+         MOV DS:[Orientador.puntoInicialTop],finAsciiDigito
+         MOV DS:[Orientador.puntoFinalTop],inicioAsciiDigito 
+      fin:
+         MOV cl,DS:[Orientador.puntoInicialTop]
+endm
+
 imprimirTop macro indicadorTitulo
      LOCAL topPuntajes, topTiempos, fin
-     mostrarEncabezado
+     ;mostrarEncabezado
      cmp indicadorTitulo, 0
      je  topPuntajes
      cmp indicadorTitulo, 1
@@ -524,7 +578,7 @@ imprimirTop macro indicadorTitulo
         imprimirEnConsola escritorFicheroActual[0]       
 endm    
 
-accionarTopResultados macro indicadorAccion
+accionarTopResultados macro indicadorAccion, indicadorOrden
      LOCAL elegirElementos, mostrarTopPuntajes, mostrarTopTiempos, generarTopPuntajes, generarTopTiempos, Fin
      elegirElementos:                                       
         cmp indicadorAccion, 0 ;mostrar Top Puntajes consola  
@@ -537,11 +591,13 @@ accionarTopResultados macro indicadorAccion
         je  generarTopTiempos
      mostrarTopPuntajes:
         MOV bh, 0
+        MOV al, indicadorOrden
         obtenerDataTop bh 
         imprimirTop bh 
         jmp generarTopPuntajes
      mostrarTopTiempos:
-        MOV bh, 1
+        MOV bh, 1  
+        MOV al, indicadorOrden
         obtenerDataTop bh
         imprimirTop bh
         jmp generarTopTiempos
@@ -558,27 +614,33 @@ endm
 obtenerDataTop macro indicadorElemento
     LOCAL verificarFin, asignarPuesto, obtenerUsername,separarUsuario,desplazarAFin,readecuarDestino, obtenerNivel,separarNivel,obtenerPuntaje,separarFila,obtenerTiempo,desplazarATiempo,obtenerDato,elegirElemento, finalizado,sobrepasarSeparador, reconocerSalto, desplazarSalto           
     PUSH SI
-    PUSH DI 
-    PUSH Bx ;Dado que para pasar el parámetro usamos bh pero este registro
+    PUSH DI
+    PUSH AX 
+    PUSH Bx 
+    ;Dado que para pasar el parÃ¡metro usamos bh pero este registro
     ;puede alterarse con la apertura y lectura del archivo entonces se hace un push 
     MOV dl, 1 ;indica que se use la ruta del archivo de indice 1 (Rounds.txt)
     MOV bl, 1 ;indicador de apertura y lectura archivo 
     accionarArchivoEnrutado dl, bl ;se abre y lee el contenido de se archivo 
     cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
-    POP Bx ;con el pop recuperamso el valor de la pila que se metió previamente
+    POP Bx 
+    POP AX
+    ;con el pop recuperamso los valores de la pila que se metio previamente
     xor si, si;inicializamos nuestros controles de indice
     xor di, di
-    xor cl, 0 
-    xor ch,0; 
-    ;Dado que en el archivo ya están ordenados los elementos entonces solo se incrementa
-    ;el contador como representación del puesto en el top
+    xor cl, cl;reestablecemos a 0 nuestro contadores
+    xor ch, ch;
+    establecerPuntoInicial
+    ;Establece para CL el inicio y el fin (dado que sirve para asendentes y descendentes) 
+    ;BasÃ¡ndonos en el top 10
     verificarFin:
       cmp  lectorEntradaFicheros[di], finCadena
       je finalizado
-      cmp  cl, 10 ; 10 dado que es top 10
+      cmp  cl, DS:[Orientador.puntoFinalTop] ; el fin se establecio en "establecerPuntoInicial"
       je finalizado 
     asignarPuesto:
-       MOV escritorFicheroActual[si], punto
+       MOV escritorFicheroActual[si], cl
+       ;guarda la cuenta en hexa de los datos reconocidos, asi mismo sirve como indicador del "puesto en el top"
        inc si
        MOV escritorFicheroActual[si], punto
        inc si
@@ -590,11 +652,11 @@ obtenerDataTop macro indicadorElemento
        cmp lectorEntradaFicheros[di], coma
        je  separarUsuario
        jmp obtenerUsername
-    separarUsuario:; agrega espacios como separación   
+    separarUsuario:; agrega espacios como separaciÃ³n   
        MOV escritorFicheroActual[si], espacio
        inc si
        inc ch
-       cmp ch, 15
+       cmp ch, cantidadSeparacion
        jl  separarUsuario
        xor ch, ch
        inc di
@@ -606,11 +668,11 @@ obtenerDataTop macro indicadorElemento
        cmp lectorEntradaFicheros[di], coma
        je  separarNivel
        jmp obtenerNivel
-    separarNivel:; agrega espacios como separación entre los datos   
+    separarNivel:; agrega espacios como separaciÃ³n entre los datos   
        MOV escritorFicheroActual[si], espacio
        inc si
        inc ch
-       cmp ch, 15
+       cmp ch, cantidadSeparacion
        jl  separarNivel
        xor ch, ch
        inc di
@@ -619,8 +681,7 @@ obtenerDataTop macro indicadorElemento
        je   obtenerPuntaje
        cmp  bh, 1
        je  readecuarDestino 
-    obtenerPuntaje:
-       ;inc di    
+    obtenerPuntaje:   
        MOV bl, lectorEntradaFicheros[di]
        MOV escritorFicheroActual[si], bl 
        inc si
@@ -638,7 +699,9 @@ obtenerDataTop macro indicadorElemento
        inc si
        MOV escritorFicheroActual[si],saltoLn 
        inc si
-       inc cl; ya se obtuvo la data de un usuario, se incrementa su cuenta
+       direccionarTop
+       ; ya se obtuvo la data de un usuario, entinces en base a si es ascendente o descente se incremente
+       ;o decrece la cuenta
     reconocerSalto: 
         inc di
         cmp lectorEntradaFicheros[di], retornoCR
@@ -672,10 +735,10 @@ obtenerDataTop macro indicadorElemento
 endm    
      
        
-;================ DEFINICIÓN DE MODELO Y PILA ==============================       
-.model small ;small: Se utilizará sólo un segmento de datos con un segmento de código,
+;================ DEFINICIÃ“N DE MODELO Y PILA ==============================       
+.model small ;small: Se utilizarÃ¡ solo un segmento de datos con un segmento de cÃ³digo,
              ;en total 128 Kbytes de memoria
-.stack 100h  ;asignamos su tamaño 
+.stack 100h  ;asignamos su tamaÃ±o 
 ;================ SEGMENTO DE DATOS ============================== 
 .data   
   
@@ -683,9 +746,9 @@ endm
 saltoLn EQU 0ah ;0ah-> 10 -> \n 
 retornoCR EQU 0dh ;0dh-> 13 ->\r       
 tabulador EQU 09h ;09h -> 9 -> \t    
-EtildadaMinus EQU 82h ;82H -> 130 -> é
-ItildadaMinus EQU 0A1h ;A1H -> 161 -> í
-OtildadaMinus EQU 0A2h ;A2H -> 162 -> ó
+EtildadaMinus EQU 82h ;82H -> 130 -> Ã©
+ItildadaMinus EQU 0A1h ;A1H -> 161 -> Ã­
+OtildadaMinus EQU 0A2h ;A2H -> 162 -> Ã³
 coma EQU 2ch ;2ch-> 44 -> , 
 punto EQU 2eh ;2eh-> 46 -> ,  
 puntoComa EQU 3bh ;3bh-> 59 -> ;
@@ -693,46 +756,51 @@ espacio EQU 20h;20h->32 -> espacio en blanco
 finRutaFichero EQU 0h ;0h-> 0 -> 0 
 finCadena EQU 24h ;24h-> 36 -> $
 dimensionLectorTeclado EQU 14h; 20D 
-dimensionLectorFicheros EQU 0c8h;200D 
-dimensionEscritorFicheros EQU 0c8h;200D 
-longMaxUsuario EQU 07h;7 caracteres máximo
+dimensionLectorFicheros EQU 7d0h;2000D 
+dimensionEscritorFicheros EQU 7d0h;2000D 
+longMaxUsuario EQU 07h;7 caracteres mÃ¡ximo
 longMaxPass EQU 04h;4 digitos fijos  
 permisoLecturaEscritura EQU 02h; 2 hace referencia a ese modo de acceso en ficheros 
-modoEstandar EQU 00h; 0 hace referencia a ese modo o tipo estándar en ficheros 
+modoEstandar EQU 00h; 0 hace referencia a ese modo o tipo estÃ¡ndar en ficheros 
+cantidadSeparacion EQU 15 ;sirve como cuenta para los sepradores en los reportes
+inicioAsciiDigito EQU 0030h; es el 0 decimal en ascii
+finAsciiDigito EQU 003ah; se tomarÃ¡ como representaciÃ³n del 10 decimal en ascii
   
 ;=== INTERRUPCIONES EQUIVALENTES === 
 subFuncionLeerCaracter EQU 01h ;01h -> 1 -> Entrada de caracter con salida
-subFuncionVerCadena EQU 09h ;09h -> 9 -> Visualización de una cadena de caracteres   
+subFuncionVerCadena EQU 09h ;09h -> 9 -> VisualizaciÃ³n de una cadena de caracteres   
 subFuncionCrearFichero EQU 3ch ;3ch -> 60 -> Crear Fichero
 subFuncionAbrirFichero EQU 3dh ;3dh -> 61 -> Abrir Fichero  
 subFuncionCerrarFichero EQU 3eh; 3eh-> 62 -> Cerrar Archivo
 subFuncionLeerFichero EQU 3fh ;3fh -> 63 -> Lectura de Fichero o dispositivo
 subFuncionAdjuntarInfoFichero EQU 40h ;40h -> 64 -> Escritura(Adjuntada) en Fichero o dispositivo.
-subFuncionFinPrograma EQU 4ch ;4ch -> 76 -> Terminación de Programa con Código de Retorno 
-funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS  
+subFuncionFinPrograma EQU 4ch ;4ch -> 76 -> TerminaciÃ³n de Programa con CÃ³digo de Retorno 
+funcionesDOS EQU 21h ;21h -> 33 -> peticiÃ³n de funciÃ³n al DOS  
    
 ;=== VECTORES ===            
 lectorEntradaTeclado db 20 dup(finCadena); llenamos el vector de $ y agregamos un final de cadena
-lectorEntradaFicheros db 200 dup(finCadena)
-escritorFicheroActual db 200 dup(finCadena);
+lectorEntradaFicheros db 2000 dup(finCadena)
+escritorFicheroActual db 2000 dup(finCadena);
 lectorEntradaUsuario db 20 dup(finCadena);
 lectorEntradaPass db 20 dup(finCadena);   
   
 ;Rutas ejecutando desde Emu8086:
-nombreArchivoJugadores db 'C:\B\Gamers.txt',finRutaFichero ;En dosbox es 'B\Gamers.txt',finRutaFichero
-nombreArchivoPartidas db 'C:\B\Rounds.txt',finRutaFichero  ;En dosbox es 'B\Rounds.txt',finRutaFichero
-nombreReportePuntajes db 'C:\B\Puntos.rep',finRutaFichero  ;En dosbox es 'B\Puntos.txt',finRutaFichero
-nombreReporteTiempos db 'C:\B\Tiempo.rep',finRutaFichero   ;En dosbox es 'B\Tiempo.txt',finRutaFichero
-nombreArchivoAdmins db 'C:\B\Admins.txt',finRutaFichero     ;En dosbox es 'B\Asmins.txt',finRutaFichero
+nombreArchivoJugadores db 'B\Gamers.txt',finRutaFichero ;En dosbox es 'B\Gamers.txt',finRutaFichero
+nombreArchivoPartidas db 'B\Rounds.txt',finRutaFichero  ;En dosbox es 'B\Rounds.txt',finRutaFichero
+nombreReportePuntajes db 'B\Puntos.rep',finRutaFichero  ;En dosbox es 'B\Puntos.txt',finRutaFichero
+nombreReporteTiempos db 'B\Tiempo.rep',finRutaFichero   ;En dosbox es 'B\Tiempo.txt',finRutaFichero
+nombreArchivoAdmins db 'B\Admins.txt',finRutaFichero     ;En dosbox es 'B\Asmins.txt',finRutaFichero
 controladorFicheros dw ?      
 
 ;=== CADENAS PARA MENSAJES EN CONSOLA ===    
 ;=== SEPARADORES ===                                      
 tituloJuego db saltoLn,retornoCR,'!@!@!@!@!@!@! ASM BALL BREAKER !@!@!@!@!@!@!@!@!',saltoLn,finCadena 
 lineaSeparadora db saltoLn,retornoCR,'!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!',saltoLn,finCadena  
+
 ;===   DATOS   ===
 datosCurso db saltoLn,retornoCR, 'Universidad de San Carlos de Guatemala', saltoLn,retornoCR,'Facultad de Ingenier',ItildadaMinus,'a', saltoLn,retornoCR,'Arquitectura de Computadores y Ensambladores 1', saltoLn,retornoCR,'Segundo Semestre 2020', saltoLn,retornoCR,'Secci',OtildadaMinus,'n: A', saltoLn,retornoCR,'Proyecto 2', saltoLn,retornoCR,finCadena                                                                                 
 misDatos db saltoLn,retornoCR,tabulador,'Byron Gerardo Castillo G',OtildadaMinus,'mez',saltoLn,retornoCR,tabulador,tabulador,'20170544',finCadena
+
 ;===   ALERTAS   ===  
 debug db saltoLn,retornoCR,'Punto Debug...',saltoLn,retornoCR,finCadena  
 bienvenidaAdmin db saltoLn,retornoCR,'@: BIENVENIDO ',finCadena
@@ -745,7 +813,7 @@ usuarioRegistrado db saltoLn,retornoCR,'Usuario registrado, ya puede utilizarlo 
 usuarioErroneo db saltoLn,retornoCR,'El usuario no existe!!',saltoLn,retornoCR,finCadena
 usuarioEnUso db saltoLn,retornoCR,'El usuario ya existe, elija uno nuevo!!',saltoLn,retornoCR,finCadena
 passErroneo db saltoLn,retornoCR,'El pass es incorrecto!!',saltoLn,retornoCR,finCadena 
-passNoNumerico db saltoLn,retornoCR,'El pass no es del todo numérico!!',saltoLn,retornoCR,finCadena  
+passNoNumerico db saltoLn,retornoCR,'El pass no es del todo numÃ©rico!!',saltoLn,retornoCR,finCadena  
 usuarioMaxError db saltoLn,retornoCR,'El usuario ingresado sobrepasa el max(7) de caracteres',saltoLn,retornoCR,finCadena
 passMaxError db saltoLn,retornoCR,'El pass ingresado sobr0epasa el max(4) de digitos o no es del todo numerico',finCadena
 velocidadErronea db saltoLn,retornoCR,'La velocidad ingresada es incorrecta',saltoLn,retornoCR,finCadena
@@ -753,11 +821,13 @@ aperturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de ab
 lecturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de leer el fichero',saltoLn,retornoCR,finCadena 
 tituloTopPuntajes db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 PUNTAJES !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
 tituloTopTiempos db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 TIEMPOS !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
+
 ;=== SOLICITUDES ===    
 solicitudUsuario db saltoLn,retornoCR,'Ingrese el usuario:',saltoLn,retornoCR,finCadena   
 solicitudPass db saltoLn,retornoCR,'Ingrese el Pass:',saltoLn,retornoCR,finCadena
 solicitudVelocidad db saltoLn,retornoCR,'Ingrese la velocidad(0-9):',saltoLn,retornoCR,finCadena 
-;=== MENUS DE SELECCIÓN ===
+
+;=== MENUS DE SELECCIï¿½N ===
 menuPrincipal db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU PRINCIPAL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
               db '(1)->Ingresar al Juego.',saltoLn,retornoCR
               db '(2)->Registrar Usuario.',saltoLn,retornoCR
@@ -783,25 +853,32 @@ menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,r
                   db '(2)->Descendente.',saltoLn,retornoCR
                   db 'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
 
+;=== ESTRUCTURAS ===
+Orientador STRUC
+   puntoInicialTop db ?
+   puntoFinalTop db ?
+Orientador ENDS  
+
+;orientacionGeneral Orientador <0030h, 0039h>
+
 ;================== SEGMENTO DE CODIGO ===========================
 .code 
     asignarDIreccionDatos:
-       MOV dx,@data ; Dirección del segmento de datos
+       MOV dx,@data ; DirecciÃ³n del segmento de datos
 	   MOV ds,dx 
 	main proc 
-	        MOV bl, 1
-		    accionarTopResultados bl
-		    MOV bl, 0
-		    accionarTopResultados bl 
+	    accionarReportePuntajesAscendentes
+        accionarReporteTiemposAscendentes
+        accionarReportePuntajesDescendentes
+        accionarReporteTiemposDescendentes   
 		IniciarPrograma:
 		    mostrarEncabezado
-		     
 		    menuInicial:
 			    mostrarMenuPrincipal
 			    LecturaPrincipal:               
 			        obtenerLecturaTeclado lectorEntradaTeclado
-			        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opción valida 
-			        je distribuirSubMenu ;se manda a validar la opción
+			        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opciÃ³n valida 
+			        je distribuirSubMenu ;se manda a validar la opciÃ³n
 			    ErrorEntradaPrincipal:
 			        imprimirEnConsola opcionErronea
 			        jmp LecturaPrincipal
@@ -843,5 +920,5 @@ menuOrden db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDEN !#!#!#!#!#!#!#!#!',saltoLn,r
         errorAperturaArchivo: 
             imprimirEnConsola aperturaArchivoErronea
             jmp  menuInicial
-	main endp   
+	main endp
 end
