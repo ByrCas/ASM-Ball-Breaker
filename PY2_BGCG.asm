@@ -51,7 +51,7 @@ obtenerLecturaTeclado macro arregloLector
 endm  
 
 reiniciarLectorTeclado macro indicador  
-    LOCAL borrarTecladoGeneral, borrarTecladoUsuario, borrarTecladoPass, Fin
+    LOCAL borrarTecladoGeneral, borrarTecladoUsuario, borrarTecladoPass, borrarTecladoTop, borrarTecladoOrden, borrarTecladoOrdenamiento, borrarTecladoVelocidad, Fin
     PUSH SI  
     xor si,si;Bits de SI en 0 
     cmp indicador, 0
@@ -59,7 +59,15 @@ reiniciarLectorTeclado macro indicador
     cmp indicador, 1  
     je borrarTecladoUsuario 
     cmp indicador, 2
-    je borrarTecladoPass 
+    je borrarTecladoPass
+    cmp indicador, 3
+    je borrarTecladoTop
+    cmp indicador, 4
+    je borrarTecladoOrden
+    cmp indicador, 5
+    je borrarTecladoOrdenamiento
+    cmp indicador, 6
+    je borrarTecladoVelocidad 
     borrarTecladoGeneral:
         MOV lectorEntradaTeclado[si], finCadena 
         inc si
@@ -77,6 +85,30 @@ reiniciarLectorTeclado macro indicador
         inc si
         cmp si, 14h;tamaño lector
         jl borrarTecladoPass 
+        jmp Fin
+    borrarTecladoTop:
+        MOV lectorEntradaTop[si], finCadena 
+        inc si
+        cmp si, 14h;tamaño lector
+        jl borrarTecladoTop 
+        jmp Fin
+    borrarTecladoOrden:
+        MOV lectorEntradaOrden[si], finCadena 
+        inc si
+        cmp si, 14h;tamaño lector
+        jl borrarTecladoOrden 
+        jmp Fin 
+    borrarTecladoOrdenamiento:
+        MOV lectorEntradaOrdenamiento[si], finCadena 
+        inc si
+        cmp si, 14h;tamaño lector
+        jl borrarTecladoOrdenamiento 
+        jmp Fin
+    borrarTecladoVelocidad:
+        MOV lectorEntradaVelocidad[si], finCadena 
+        inc si
+        cmp si, 14h;tamaño lector
+        jl borrarTecladoVelocidad             
     Fin:    
         POP SI
 endm   
@@ -189,32 +221,6 @@ brindarBienvenidaAdmin macro
      imprimirEnConsola bienvenidaAdmin 
      imprimirEnConsola lectorEntradaUsuario[0];imprime todo el contenido del arreglo(actualmente el username)
 endm    
-
-;Los valores que se pasan a las macros "accionar resultados"
-;determinan el orden(asc/desc) y si es reporte de tiempos o de puntajes
-accionarReportePuntajesAscendentes macro
-    MOV bl, 0 ;puntajes ascen
-    MOV ah, 0 
-    accionarTopResultados bl, ah
-endm 
-
-accionarReporteTiemposAscendentes macro
-    MOV bl, 1 ;tiempos ascen
-    MOV ah, 0 
-    accionarTopResultados bl, ah
-endm 
-
-accionarReportePuntajesDescendentes macro
-    MOV bl, 0  ;puntajes desc
-    MOV ah, 1 
-    accionarTopResultados bl, ah
-endm 
-
-accionarReporteTiemposDescendentes macro
-    MOV bl, 1  ;tiempos desc
-    MOV ah, 1
-    accionarTopResultados bl, ah
-endm 
 
 
 verificarAdmin macro    
@@ -528,7 +534,7 @@ verificarRegistro macro
             xor si,si
             xor di,di   
         registro:
-            adjuntarContenidoArchivo cx escritorFicheroActual controladorFicheros
+            adjuntarContenidoArchivo cx,escritorFicheroActual,controladorFicheros
             cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
             reiniciarEscritorFicheros
             imprimirEnConsola usuarioRegistrado 
@@ -635,10 +641,6 @@ accionarTopResultados macro indicadorAccion, indicadorOrden
         je  mostrarTopPuntajes
         cmp indicadorAccion, 1 ;mostrar Top Tiempos consola
         je  mostrarTopTiempos
-        cmp indicadorAccion, 2 ;generar Fichero Top Puntajes 
-        je  generarTopPuntajes
-        cmp indicadorAccion, 3 ;generar Fichero Top Tiempos 
-        je  generarTopTiempos
      mostrarTopPuntajes:
         MOV bh, 0
         MOV al, indicadorOrden
@@ -782,7 +784,158 @@ obtenerDataTop macro indicadorElemento
        xor di, di
        POP SI
        POP DI   
-endm    
+endm  
+
+obtenerLecturaOpcionTop macro
+    LOCAL LecturaTop, ErrorEntradaTop, distribuirSubMenuTop, subMenusTop, seccionOrdenReportes 
+    imprimirEnConsola menuTops 
+    LecturaTop:               
+        obtenerLecturaTeclado lectorEntradaTop
+        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opción valida 
+        je distribuirSubMenuTop ;se manda a validar la opción
+        ErrorEntradaTop:
+            imprimirEnConsola opcionErronea
+            MOV dl, 3 ;indicador de borrar teclado top 
+            reiniciarLectorTeclado dl
+            jmp LecturaTop
+    distribuirSubMenuTop:  
+        MOV cl,0; reiniciamos el contador para futuras ocasiones  
+        subMenusTop:             
+            cmp lectorEntradaTop[0],'1'
+            je  seccionOrdenReportes 
+            cmp lectorEntradaTop[0],'2'
+            je  seccionOrdenReportes 
+            cmp lectorEntradaTop[0],'3'
+            je  menuInicial 
+            MOV dl, 3 ;indicador de borrar teclado top 
+            reiniciarLectorTeclado dl  
+            JMP ErrorEntradaTop
+    seccionOrdenReportes:
+            obtenerLecturaOpcionOrden         
+endm
+
+obtenerLecturaOpcionOrden macro
+    LOCAL LecturaOrden, distribuirSubMenuOrden, ErrorEntradaOrden, subMenusOrden, seccionOrdenamientoReportes
+    imprimirEnConsola menuOrden
+    LecturaOrden:               
+        obtenerLecturaTeclado lectorEntradaOrden
+        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opción valida 
+        je distribuirSubMenuOrden ;se manda a validar la opción
+        ErrorEntradaOrden:
+            imprimirEnConsola opcionErronea
+            MOV dl, 4 ; indicador borrar teclado orden
+            reiniciarLectorTeclado dl 
+            jmp LecturaOrden
+    distribuirSubMenuOrden:  
+        MOV cl,0; reiniciamos el contador para futuras ocasiones  
+        subMenusOrden:             
+            cmp lectorEntradaOrden[0],'1'
+            je  seccionOrdenamientoReportes 
+            cmp lectorEntradaOrden[0],'2'
+            je  seccionOrdenamientoReportes 
+            MOV dl, 4 ; indicador borrar teclado orden
+            reiniciarLectorTeclado dl  
+            JMP ErrorEntradaOrden
+    seccionOrdenamientoReportes:
+            obtenerLecturaOpcionOrdenamiento   
+endm
+
+obtenerLecturaOpcionOrdenamiento macro
+    LOCAL LecturaOrdenamiento, ErrorEntradaOrdenamiento, distribuirSubMenuOrdenamiento, subMenusOrdenamiento , seccionVelocidadReportes 
+    imprimirEnConsola menuOrdenamientos
+    LecturaOrdenamiento:               
+        obtenerLecturaTeclado lectorEntradaOrdenamiento
+        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opción valida 
+        je distribuirSubMenuOrdenamiento ;se manda a validar la opción
+        ErrorEntradaOrdenamiento:
+            imprimirEnConsola opcionErronea
+            MOV dl, 5 ; indicador borrar teclado orden
+            reiniciarLectorTeclado dl 
+            jmp LecturaOrdenamiento
+    distribuirSubMenuOrdenamiento:  
+        MOV cl,0; reiniciamos el contador para futuras ocasiones  
+        subMenusOrdenamiento:             
+            cmp lectorEntradaOrdenamiento[0],'1'
+            je  seccionVelocidadReportes 
+            cmp lectorEntradaOrdenamiento[0],'2'
+            je  seccionVelocidadReportes
+            cmp lectorEntradaOrdenamiento[0],'3'
+            je  seccionVelocidadReportes 
+            MOV dl, 5 ; indicador borrar teclado ordenamiento
+            reiniciarLectorTeclado dl  
+            JMP ErrorEntradaOrdenamiento
+    seccionVelocidadReportes:
+            obtenerLecturaOpcionVelocidad 
+endm
+
+obtenerLecturaOpcionVelocidad macro
+    LOCAL LecturaVelocidad, ErrorEntradaVelocidad, distribuirSubMenuVelocidad, subMenusVelocidad, validacion  
+    imprimirEnConsola solicitudVelocidad  
+    LecturaVelocidad:               
+        obtenerLecturaTeclado lectorEntradaVelocidad
+        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opción valida 
+        je distribuirSubMenuVelocidad ;se manda a validar la opción
+        ErrorEntradaVelocidad:
+            imprimirEnConsola opcionErronea
+            MOV dl, 6 ; indicador borrar teclado orden
+            reiniciarLectorTeclado dl 
+            jmp LecturaVelocidad
+    distribuirSubMenuVelocidad:  
+        MOV cl,0; reiniciamos el contador para futuras ocasiones  
+        subMenusVelocidad: 
+            cmp lectorEntradaVelocidad[0],'0'
+            ;asignar velocidad
+            je  validacion             
+            cmp lectorEntradaVelocidad[0],'1'
+            je  validacion 
+            cmp lectorEntradaVelocidad[0],'2'
+            je  validacion
+            cmp lectorEntradaVelocidad[0],'3'
+            je  validacion 
+            cmp lectorEntradaVelocidad[0],'4'
+            je  validacion 
+            cmp lectorEntradaVelocidad[0],'5'
+            je  validacion 
+            cmp lectorEntradaVelocidad[0],'6'
+            je  validacion 
+            cmp lectorEntradaVelocidad[0],'7'
+            je  validacion 
+            cmp lectorEntradaVelocidad[0],'8'
+            je  validacion 
+            cmp lectorEntradaVelocidad[0],'9'
+            je  validacion  
+            MOV dl, 6 ; indicador borrar teclado ordenamiento
+            reiniciarLectorTeclado dl  
+            JMP ErrorEntradaVelocidad
+    validacion:
+            validarParametrosReporte
+endm
+
+;Los valores que se pasan a las macros "accionar resultados"
+;determinan el orden(asc/desc) y si es reporte de tiempos o de puntajes
+validarParametrosReporte macro
+    LOCAL evaluarOrden, accionarAscendente, accionarDescendente, evaluarTop, accionarPuntajes, accionarTiempos, generarTop
+    evaluarOrden:
+        cmp lectorEntradaOrden[0], '2'; orden descendente
+        je  accionarDescendente
+        accionarAscendente:
+            MOV ah, 0  ;0 asc
+            jmp evaluarTop
+        accionarDescendente:
+            MOV ah, 1  ;1 desc
+    evaluarTop:
+        cmp lectorEntradaTop[0], '2'; top de tiempos
+        je  accionarTiempos        
+        accionarPuntajes:
+            MOV bl, 0  ;puntajes
+            jmp generarTop
+        accionarTiempos:
+            MOV bl, 1  ;tiempos
+    generarTop: 
+        ;animación y ordenamiewnto
+        accionarTopResultados bl, ah
+        jmp seccionTops ;hay que validar una paequeña pausa
+endm
      
        
 ;================ DEFINICIÓN DE MODELO Y PILA ==============================       
@@ -832,7 +985,11 @@ lectorEntradaTeclado db 20 dup(finCadena); llenamos el vector de $ y agregamos u
 lectorEntradaFicheros db 2000 dup(finCadena)
 escritorFicheroActual db 2000 dup(finCadena);
 lectorEntradaUsuario db 20 dup(finCadena);
-lectorEntradaPass db 20 dup(finCadena);   
+lectorEntradaPass db 20 dup(finCadena);
+lectorEntradaTop db 20 dup(finCadena)
+lectorEntradaOrden db 20 dup(finCadena)
+lectorEntradaOrdenamiento db 20 dup(finCadena);
+lectorEntradaVelocidad db 20 dup(finCadena)   
   
 ;Rutas ejecutando desde Emu8086:
 nombreArchivoJugadores db 'B\Gamers.txt',finRutaFichero ;En dosbox es 'B\Gamers.txt',finRutaFichero
@@ -875,7 +1032,7 @@ tituloTopTiempos db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 TIEMPOS !#!#!#!#!#
 ;=== SOLICITUDES ===    
 solicitudUsuario db saltoLn,retornoCR,'Ingrese el usuario:',saltoLn,retornoCR,finCadena   
 solicitudPass db saltoLn,retornoCR,'Ingrese el Pass:',saltoLn,retornoCR,finCadena
-solicitudVelocidad db saltoLn,retornoCR,'Ingrese la velocidad(0-9):',saltoLn,retornoCR,finCadena 
+solicitudVelocidad db saltoLn,retornoCR,'Ingrese la velocidad(0-9):',saltoLn,retornoCR,finCadena
 
 ;=== MENUS DE SELECCIÓN ===
 menuPrincipal db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU PRINCIPAL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
@@ -918,10 +1075,10 @@ Orientador ENDS
        MOV dx,@data ; Dirección del segmento de datos
 	   MOV ds,dx 
 	main proc 
-	    accionarReportePuntajesAscendentes
-        accionarReporteTiemposAscendentes
-        accionarReportePuntajesDescendentes
-        accionarReporteTiemposDescendentes   
+	    ;accionarReportePuntajesAscendentes
+        ;accionarReporteTiemposAscendentes
+        ;accionarReportePuntajesDescendentes
+        ;accionarReporteTiemposDescendentes   
 	    IniciarPrograma:
 		    mostrarEncabezado
 		    menuInicial:
@@ -929,31 +1086,25 @@ Orientador ENDS
 			    LecturaPrincipal:               
 			        obtenerLecturaTeclado lectorEntradaTeclado
 			        cmp cl,1 ;Si la longitud de entrada es 1 puede ser una opción valida 
-			        je distribuirSubMenu ;se manda a validar la opción
+			        je distribuirSubMenuPrincipal ;se manda a validar la opción
 			    ErrorEntradaPrincipal:
 			        imprimirEnConsola opcionErronea
 			        jmp LecturaPrincipal
 		seccionIngreso:
 		    imprimirEnConsola menuIngreso   
-	        ;verificarIngreso   
+	        verificarIngreso   
 		seccionRegistro:
 		    imprimirEnConsola menuRegistro 
-		    ;verificarRegistro
+		    verificarRegistro
 		    jmp  menuInicial 
 		seccionTops:
-		    imprimirEnConsola menuTops 
-		    jmp  menuInicial
-		seccionOrdenamientos:
-		    imprimirEnConsola menuOrdenamientos 
-		    jmp  menuInicial
-		seccionOrden:
-		    imprimirEnConsola menuOrden 
+             obtenerLecturaOpcionTop             
 		iniciarJuego:
 		    imprimirEnConsola inicioJuego 
 		    jmp  menuInicial    
 		Salir: 
 			salirPrograma  
-	    distribuirSubMenu:  
+	    distribuirSubMenuPrincipal:  
             MOV cl,0; reiniciamos el contador para futuras ocasiones  
             subMenusPrincipal:             
                 cmp lectorEntradaTeclado[0],'1'
