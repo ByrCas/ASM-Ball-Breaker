@@ -4,3 +4,5 @@ byrcas,8080;
 Byron,1536;
 lorem,0412;
 asm,0000;
+GERARDO,1842;
+Masm,8181;
