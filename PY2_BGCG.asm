@@ -19,7 +19,8 @@ include M/m_lvls.asm
 ;================ SEGMENTO DE DATOS ============================== 
 .data   
   
-;=== EQUIVALENTES ===     
+;=== EQUIVALENTES ===========================================   
+;Simbolos:  
 saltoLn EQU 0ah ;0ah-> 10 -> \n 
 retornoCR EQU 0dh ;0dh-> 13 ->\r       
 tabulador EQU 09h ;09h -> 9 -> \t    
@@ -32,23 +33,31 @@ puntoComa EQU 3bh ;3bh-> 59 -> ;
 espacio EQU 20h;20h->32 -> espacio en blanco  
 finRutaFichero EQU 0h ;0h-> 0 -> 0 
 finCadena EQU 24h ;24h-> 36 -> $
+
+;Dimensiones y longitudes:
 dimensionLectorTeclado EQU 14h; 20D 
 dimensionLectorFicheros EQU 7d0h;2000D 
 dimensionEscritorFicheros EQU 7d0h;2000D 
 longMaxUsuario EQU 07h;7 caracteres máximo
 longMaxPass EQU 04h;4 digitos fijos  
+
+;indicadores
 permisoLecturaEscritura EQU 02h; 2 hace referencia a ese modo de acceso en ficheros 
 modoEstandar EQU 00h; 0 hace referencia a ese modo o tipo estándar en ficheros 
-cantidadSeparacion EQU 15 ;sirve como cuenta para los sepradores en los reportes
+cantidadSeparacion EQU 15 ;sirve como cuenta para los espacios sepradores en los reportes
 inicioAsciiDigito EQU 0030h; es el 0 decimal en ascii
 finAsciiDigito EQU 003ah; se tomará como representación del 10 decimal en ascii
 modoVideoGrafico EQU 13h ;13h -> 19 ->320 x 200 de resolución y 256 colores
 modoTextoEstandar EQU 03h ;03h -> 3 -> Establece el modo texto (se usa para regresar del modo video) 80x25. 16 colores. 8 paginas.
 direccionBaseMemoriaGrafica EQU 0A000h; Sirve para establecwer a DS la dir. de memoria gráfica y optimizar mejor los resultados proyectados en pantalla 1 página
+
+;indicadores de juego:
 pixelesTotales EQU 0FA00h; 64,000 pixeles en ese modo de resolución 320 * 200
 tamanioFila EQU 320 ;el tamaño de fila es de 320 columnas en el modo video 13h, se emplea para ubicar la matriz linealizada/mapeada en memoria
 alturaBloque EQU 5 ;Es el número de lineas que formasn un bloque
 alturaPelota EQU 3 ;Es el número de lineas que formasn una pelota
+posicionBaseBarraGrafica EQU 200 ;fila base desde donde se generará la barra hacia arriba
+
   
 ;=== COLORES EQUIVALENTES === 
 colorBlancoGrafico EQU 0fh
@@ -179,15 +188,28 @@ Graficador STRUC
 Graficador ENDS 
 ;Guarda toda la configuracio´n par al animación de oso gráficos de ordenamientos
 
+Barra STRUC
+   pixelesAncho db ?
+   pixelesAlto db ?
+   columnaActual dw ?
+   colorActual db ?
+Barra ENDS 
+;Guarda toda la información referente a la barra de gráficos
+
+BarraDinamica Barra <20, 40, 100, colorCelesteGrafico>
+
 ;orientacionGeneral Orientador <0030h, 0039h>
 
 ;================== SEGMENTO DE CODIGO ===========================
 .code 
     call establecerSegmentoDatos
         call establecerModoVideo
-        call pintarPrimerNivel
-        call pintarSegundoNivel
-        call pintarTercerNivel
+        ;call pintarPrimerNivel
+        ;limpiarEscenario
+        ;call pintarSegundoNivel
+        ;limpiarEscenario
+        ;call pintarTercerNivel
+        call barraDib
         call establecerModoTexto
 	main proc 
 	    IniciarPrograma:
@@ -319,6 +341,16 @@ Graficador ENDS
         dibujarPelota
         ret
     dibujarPelotaEstandar endp
+
+    barraDib proc
+        call dibujarMarcoGrafico
+        probarBarra
+        pedirTecla:
+            ; esperar por tecla
+            mov ah,10h
+            int 16h  
+        ret
+    barraDib endp
 
     pintarPos proc
        PUSH SI
