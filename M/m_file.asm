@@ -1,4 +1,5 @@
 
+;================ MACROS PARA EL MANEJO DE FICHEROS ============================== 
 
 abrirArchivo macro rutaArchivo,controlador
     mov ah,subFuncionAbrirFichero

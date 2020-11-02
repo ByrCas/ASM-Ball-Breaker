@@ -1,4 +1,5 @@
 
+;================ MACROS DE RECONOCIMIENTO DE TECLADO============================== 
 
 obtenerTecla macro
     mov ah,subFuncionLeerCaracter

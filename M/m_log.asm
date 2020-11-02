@@ -1,4 +1,6 @@
 
+;================ MACROS DE INGRESO/ACCESO Y MODO ADMIN ============================== 
+
 brindarBienvenidaAdmin macro
      imprimirEnConsola bienvenidaAdmin 
      imprimirEnConsola lectorEntradaUsuario[0];imprime todo el contenido del arreglo(actualmente el username)

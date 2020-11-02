@@ -1,4 +1,6 @@
 
+;================ MACROS DE FUNCIONES PRINCIPALES DEL PROGRAMA============================== 
+
 salirPrograma macro          
     imprimirEnConsola salidaJuego
     MOV ah,subFuncionFinPrograma 

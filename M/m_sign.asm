@@ -1,4 +1,6 @@
 
+;================ MACROS PARA EL REGISTRO DE JUGADORES VALIDADOS ============================== 
+
 verificarRegistro macro  
      LOCAL LecturaIngresoUsuario, ErrorEntradaUsuario, reVerificarUsuario, verificarUsuario,denegarCaracter, aceptarCaracter,usuarioExistente,LecturaIngresoPass,ErrorEntradaPass, verificarDigitos, numerico, noNumerico,registroUsuario,transferirOriginal, separarFilaNueva, transferirUsuario, separarColumna, separarColumna, transferirPass, separarRegistroNuevo, registro  
      LecturaIngresoUsuario:   

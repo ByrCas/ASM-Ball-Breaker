@@ -9,6 +9,8 @@ include M/m_log.asm
 include M/m_main.asm 
 include M/m_reps.asm 
 include M/m_sign.asm 
+include M/m_figs.asm 
+include M/m_lvls.asm 
 
 ;================ DEFINICIÓN DE MODELO Y PILA ==============================       
 .model small ;small: Se utilizará solo un segmento de datos con un segmento de código,
@@ -40,7 +42,24 @@ modoEstandar EQU 00h; 0 hace referencia a ese modo o tipo estándar en ficheros
 cantidadSeparacion EQU 15 ;sirve como cuenta para los sepradores en los reportes
 inicioAsciiDigito EQU 0030h; es el 0 decimal en ascii
 finAsciiDigito EQU 003ah; se tomará como representación del 10 decimal en ascii
+modoVideoGrafico EQU 13h ;13h -> 19 ->320 x 200 de resolución y 256 colores
+modoTextoEstandar EQU 03h ;03h -> 3 -> Establece el modo texto (se usa para regresar del modo video) 80x25. 16 colores. 8 paginas.
+direccionBaseMemoriaGrafica EQU 0A000h; Sirve para establecwer a DS la dir. de memoria gráfica y optimizar mejor los resultados proyectados en pantalla 1 página
+pixelesTotales EQU 0FA00h; 64,000 pixeles en ese modo de resolución 320 * 200
+tamanioFila EQU 320 ;el tamaño de fila es de 320 columnas en el modo video 13h, se emplea para ubicar la matriz linealizada/mapeada en memoria
+alturaBloque EQU 5 ;Es el número de lineas que formasn un bloque
+alturaPelota EQU 3 ;Es el número de lineas que formasn una pelota
   
+;=== COLORES EQUIVALENTES === 
+colorBlancoGrafico EQU 0fh
+colorRojoGrafico EQU 28h
+colorAmarilloGrafico EQU 0eh
+colorVerdeGrafico EQU 2eh
+colorCelesteGrafico EQU 4eh
+colorPielGrafico EQU 5ah
+colorAzulGrafico EQU 21h
+colorNegroGrafico EQU 00h
+
 ;=== INTERRUPCIONES EQUIVALENTES === 
 subFuncionLeerCaracter EQU 01h ;01h -> 1 -> Entrada de caracter con salida
 subFuncionVerCadena EQU 09h ;09h -> 9 -> Visualización de una cadena de caracteres   
@@ -50,7 +69,13 @@ subFuncionCerrarFichero EQU 3eh; 3eh-> 62 -> Cerrar Archivo
 subFuncionLeerFichero EQU 3fh ;3fh -> 63 -> Lectura de Fichero o dispositivo
 subFuncionAdjuntarInfoFichero EQU 40h ;40h -> 64 -> Escritura(Adjuntada) en Fichero o dispositivo.
 subFuncionFinPrograma EQU 4ch ;4ch -> 76 -> Terminación de Programa con Código de Retorno 
-funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS  
+funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS 
+
+subFuncionModoVideo EQU 00h ;00h->0->Establecer modo de video
+funcionesDespligueVideo EQU 10h ;10h -> 16 -> funciones de modo gráfico o video
+
+subFuncionEstadoTeclado EQU 10h;10h -> 16 -> verifica el estado del teclado para ver si se ingresaron teclas o no mediante el valor de CF(carry flag)
+funcionesTeclado EQU 16h ;16h -> 22 ->  Servicios de Entrada y Salida de teclado
    
 ;=== VECTORES ===            
 lectorEntradaTeclado db 20 dup(finCadena); llenamos el vector de $ y agregamos un final de cadena
@@ -158,9 +183,10 @@ Graficador ENDS
 
 ;================== SEGMENTO DE CODIGO ===========================
 .code 
-    asignarDIreccionDatos:
-       MOV dx,@data ; Dirección del segmento de datos
-	   MOV ds,dx 
+    call establecerSegmentoDatos
+        call establecerModoVideo
+        call pintarPrimerNivel
+        call establecerModoTexto
 	main proc 
 	    IniciarPrograma:
 		    mostrarEncabezado
@@ -206,4 +232,94 @@ Graficador ENDS
             imprimirEnConsola aperturaArchivoErronea
             jmp  menuInicial
 	main endp
+
+    establecerSegmentoDatos proc
+        asignarDIreccionDatos:
+            MOV dx,@data ; Dirección del segmento de datos para poder acceder a las variables
+            MOV ds,dx 
+        ret 
+    establecerSegmentoDatos endp
+    
+    establecerModoVideo proc
+        asignarDIreccionDatos:
+            MOV ax, modoVideoGrafico
+            int funcionesDespligueVideo
+            MOV ax, direccionBaseMemoriaGrafica 
+            MOV ds,ax 
+        ret 
+    establecerModoVideo endp
+
+    establecerModoTexto proc
+        asignarDIreccionDatos:
+            MOV ax, 0003h
+            int funcionesDespligueVideo
+            MOV dx, @data 
+            MOV ds,dx  
+        ret 
+    establecerModoTexto endp
+
+    dibujarMarcoGrafico proc
+        dibujarContornosVerticales
+        dibujarContornosHorizontales
+        ret
+    dibujarMarcoGrafico endp
+        
+    pintarPrimerNivel proc
+        call dibujarMarcoGrafico
+        call dibujarPlataforma
+        call dibujarPelotaEstandar
+        dibujarCaparazon
+        pedirTecla:
+            ; esperar por tecla
+            mov ah,10h
+            int 16h  
+        ret
+    pintarPrimerNivel endp
+
+    dibujarPlataforma proc
+        MOV di, 50 ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV dl, colorBlancoGrafico
+        MOV ax, 185
+        MOV bx, 125
+        dibujarBloque
+        ret
+    dibujarPlataforma endp
+
+    dibujarPelotaEstandar proc
+        MOV di, 5 ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV dl, colorPielGrafico
+        MOV ax, 181
+        MOV bx, 150
+        dibujarPelota
+        ret
+    dibujarPelotaEstandar endp
+
+    pintarPos proc
+       PUSH SI
+       PUSH DI
+       PUSH AX
+       PUSH BX
+       PUSH CX  ;Se empujan los elementos ya que todos tendran otro uso durante el juego
+       PUSH DX  ; y no se debe perder o alterar su valor actual
+       MOV dl, 0fh
+       MOV ax, 99;0f; 159
+       MOV bx, 159 ;63h; 99
+       pintarBytePixel dl, ax ,bx
+        pedirTecla:
+            ; esperar por tecla
+            mov ah,10h
+            int 16h  
+       POP DX
+       POP CX
+       POP BX
+       POP AX
+       POP DI
+       POP SI 
+        ret
+    pintarPos endp
+
+    
+
+    
+
 end

@@ -1,4 +1,5 @@
 
+;================ MACROS PARA EL MANEJO DE REPORTES============================== 
 
 adjuntarEncabezadoTopPuntajes macro
     ;las dimensiones de la cadena  del encabezado serán fijas
