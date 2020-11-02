@@ -186,6 +186,8 @@ Graficador ENDS
     call establecerSegmentoDatos
         call establecerModoVideo
         call pintarPrimerNivel
+        call pintarSegundoNivel
+        call pintarTercerNivel
         call establecerModoTexto
 	main proc 
 	    IniciarPrograma:
@@ -275,6 +277,30 @@ Graficador ENDS
             int 16h  
         ret
     pintarPrimerNivel endp
+
+    pintarSegundoNivel proc
+        call dibujarMarcoGrafico
+        call dibujarPlataforma
+        call dibujarPelotaEstandar
+        dibujarCaja
+        pedirTecla:
+            ; esperar por tecla
+            mov ah,10h
+            int 16h  
+        ret
+    pintarSegundoNivel endp
+
+    pintarTercerNivel proc
+        call dibujarMarcoGrafico
+        call dibujarPlataforma
+        call dibujarPelotaEstandar
+        dibujarMensajeColorido
+        pedirTecla:
+            ; esperar por tecla
+            mov ah,10h
+            int 16h  
+        ret
+    pintarTercerNivel endp
 
     dibujarPlataforma proc
         MOV di, 50 ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
