@@ -56,7 +56,25 @@ pixelesTotales EQU 0FA00h; 64,000 pixeles en ese modo de resolución 320 * 200
 tamanioFila EQU 320 ;el tamaño de fila es de 320 columnas en el modo video 13h, se emplea para ubicar la matriz linealizada/mapeada en memoria
 alturaBloque EQU 5 ;Es el número de lineas que formasn un bloque
 alturaPelota EQU 3 ;Es el número de lineas que formasn una pelota
-posicionBaseBarraGrafica EQU 200 ;fila base desde donde se generará la barra hacia arriba
+posicionBaseBarraGrafica EQU 175 ;fila base desde donde se generará la barra hacia arriba
+
+;Coordenadas Base:
+posMargenMinimoVertical EQU 5 ;columna donde se ubica el margen minimo vertical
+posMargenMinimoHorizontal EQU 19 ;fila donde se ubica el margen minimo horizontal
+posMargenMaximoVertical EQU 314 ;columna donde se ubica el margen maximo vertical
+posMargenMaximoHorizontal EQU  194 ;fila donde se ubica el margen másimo horizontal
+longitudMargenVertical EQU 175 ;num de pixeles
+longitudMargenHorizontal EQU 310;num de pixeles
+posFilaInicialPlataforma EQU 185 ;fila de inicio plataforma
+posColumnaInicialPlataforma EQU 125 ;columna de inicio Plataforma
+posFilaInicialPelota EQU 180; fila donde inica la pelota en el juego
+posColumnaInicialPelota EQU 150; fila donde inica la pelota en el juego
+
+;direcciones de pelota
+direccionNoresteActiva EQU 00h; representación activa de Noreste
+direccionNoroesteActiva EQU 01h; representación activa de Noreste
+direccionSuresteActiva EQU 02h; representación activa de Noreste
+direccionSuroesteActiva EQU 03h; representación activa de Noreste
 
   
 ;=== COLORES EQUIVALENTES === 
@@ -83,6 +101,7 @@ funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS
 subFuncionModoVideo EQU 00h ;00h->0->Establecer modo de video
 funcionesDespligueVideo EQU 10h ;10h -> 16 -> funciones de modo gráfico o video
 
+subFuncionSolicitudTeclado EQU 01h;1h -> 1 -> guarda la tecla ingresada por teclado en AL
 subFuncionEstadoTeclado EQU 10h;10h -> 16 -> verifica el estado del teclado para ver si se ingresaron teclas o no mediante el valor de CF(carry flag)
 funcionesTeclado EQU 16h ;16h -> 22 ->  Servicios de Entrada y Salida de teclado
    
@@ -97,12 +116,12 @@ lectorEntradaOrden db 20 dup(finCadena)
 lectorEntradaOrdenamiento db 20 dup(finCadena);
 lectorEntradaVelocidad db 20 dup(finCadena)   
   
-;Rutas ejecutando desde Emu8086:
-nombreArchivoJugadores db 'B\Gamers.txt',finRutaFichero ;En dosbox es 'B\Gamers.txt',finRutaFichero
-nombreArchivoPartidas db 'B\Rounds.txt',finRutaFichero  ;En dosbox es 'B\Rounds.txt',finRutaFichero
-nombreReportePuntajes db 'B\Puntos.rep',finRutaFichero  ;En dosbox es 'B\Puntos.txt',finRutaFichero
-nombreReporteTiempos db 'B\Tiempo.rep',finRutaFichero   ;En dosbox es 'B\Tiempo.txt',finRutaFichero
-nombreArchivoAdmins db 'B\Admins.txt',finRutaFichero     ;En dosbox es 'B\Asmins.txt',finRutaFichero
+;Rutas ejecutando desde DosBox:
+nombreArchivoJugadores db 'B\Gamers.txt',finRutaFichero ;En emu8086 es 'C:\B\Gamers.txt',finRutaFichero
+nombreArchivoPartidas db 'B\Rounds.txt',finRutaFichero  ;En emu8086 es 'C:\B\Rounds.txt',finRutaFichero
+nombreReportePuntajes db 'B\Puntos.rep',finRutaFichero  ;En emu8086 es 'C:\B\Puntos.txt',finRutaFichero
+nombreReporteTiempos db 'B\Tiempo.rep',finRutaFichero   ;En emu8086 es 'C:\B\Tiempo.txt',finRutaFichero
+nombreArchivoAdmins db 'B\Admins.txt',finRutaFichero     ;En emu8086 es 'C:\B\Asmins.txt',finRutaFichero
 controladorFicheros dw ?      
 
 ;=== CADENAS PARA MENSAJES EN CONSOLA ===    
@@ -188,28 +207,39 @@ Graficador STRUC
 Graficador ENDS 
 ;Guarda toda la configuracio´n par al animación de oso gráficos de ordenamientos
 
-Barra STRUC
-   pixelesAncho db ?
-   pixelesAlto db ?
+ElementoGrafico STRUC
+   pixelesAncho dw ?
+   pixelesAlto dw ?
+   filaActual dw ?
    columnaActual dw ?
    colorActual db ?
-Barra ENDS 
+   estadoDireccion db ? ;00h noreste,01h noroeste, 02h sureste, 03h suroeste 
+ElementoGrafico ENDS 
 ;Guarda toda la información referente a la barra de gráficos
 
-BarraDinamica Barra <20, 40, 100, colorCelesteGrafico>
+BarraOrdenDinamica ElementoGrafico <20, 40, posicionBaseBarraGrafica, 15, colorCelesteGrafico, direccionSuresteActiva>
+
+plataformaMovible ElementoGrafico <50, alturaBloque, posFilaInicialPlataforma, posColumnaInicialPlataforma, colorBlancoGrafico, direccionSuresteActiva>
+
+pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicialPelota, colorPielGrafico, direccionNoroesteActiva>
+
+;pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, 50, colorPielGrafico, direccionNoroesteActiva>
+
 
 ;orientacionGeneral Orientador <0030h, 0039h>
 
 ;================== SEGMENTO DE CODIGO ===========================
 .code 
-    call establecerSegmentoDatos
+        call establecerSegmentoDatos
+        call establecerValoresInicialesPartida
         call establecerModoVideo
-        ;call pintarPrimerNivel
+        call pintarPrimerNivel
         ;limpiarEscenario
         ;call pintarSegundoNivel
         ;limpiarEscenario
         ;call pintarTercerNivel
-        call barraDib
+        ;call barraDib
+        call solicitarTeclaEspacio
         call establecerModoTexto
 	main proc 
 	    IniciarPrograma:
@@ -263,6 +293,14 @@ BarraDinamica Barra <20, 40, 100, colorCelesteGrafico>
             MOV ds,dx 
         ret 
     establecerSegmentoDatos endp
+
+    establecerDireccionVideo proc
+        PUSH AX
+        MOV ax, direccionBaseMemoriaGrafica 
+        MOV ds,ax 
+        POP AX
+        ret
+    establecerDireccionVideo endp  
     
     establecerModoVideo proc
         asignarDIreccionDatos:
@@ -282,6 +320,11 @@ BarraDinamica Barra <20, 40, 100, colorCelesteGrafico>
         ret 
     establecerModoTexto endp
 
+    establecerValoresInicialesPartida proc
+        MOV DS:[Configurador.tiempoActual],0
+        MOV DS:[Configurador.nivelActual],1
+    establecerValoresInicialesPartida endp
+
     dibujarMarcoGrafico proc
         dibujarContornosVerticales
         dibujarContornosHorizontales
@@ -293,10 +336,8 @@ BarraDinamica Barra <20, 40, 100, colorCelesteGrafico>
         call dibujarPlataforma
         call dibujarPelotaEstandar
         dibujarCaparazon
-        pedirTecla:
-            ; esperar por tecla
-            mov ah,10h
-            int 16h  
+        call solicitarTeclaEspacio
+        chequearCambios 
         ret
     pintarPrimerNivel endp
 
@@ -325,32 +366,56 @@ BarraDinamica Barra <20, 40, 100, colorCelesteGrafico>
     pintarTercerNivel endp
 
     dibujarPlataforma proc
-        MOV di, 50 ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
-        MOV dl, colorBlancoGrafico
-        MOV ax, 185
-        MOV bx, 125
+        call establecerSegmentoDatos
+        MOV di, plataformaMovible.pixelesAncho ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV dl, plataformaMovible.colorActual
+        MOV ax, plataformaMovible.filaActual
+        MOV bx, plataformaMovible.columnaActual
+        call establecerDireccionVideo
         dibujarBloque
         ret
     dibujarPlataforma endp
 
     dibujarPelotaEstandar proc
-        MOV di, 5 ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
-        MOV dl, colorPielGrafico
-        MOV ax, 181
-        MOV bx, 150
-        dibujarPelota
+        call establecerSegmentoDatos
+        MOV di, pelota.pixelesAncho ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV dl, pelota.colorActual
+        MOV ax, pelota.filaActual  
+        MOV bx, pelota.columnaActual
+        call establecerDireccionVideo
+        dibujarBloque
         ret
     dibujarPelotaEstandar endp
+
+    borrarPelotaActual proc
+        call establecerSegmentoDatos
+        MOV di, pelota.pixelesAncho ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV ax, pelota.filaActual  
+        MOV bx, pelota.columnaActual
+        call establecerDireccionVideo
+        borrarBloque
+        ret
+    borrarPelotaActual endp
 
     barraDib proc
         call dibujarMarcoGrafico
         probarBarra
-        pedirTecla:
-            ; esperar por tecla
-            mov ah,10h
-            int 16h  
         ret
     barraDib endp
+
+    solicitarTeclaEspacio proc
+        PUSH AX
+        pedirTecla:
+            ; esperar por tecla
+            mov ah,subFuncionSolicitudTeclado
+            int funcionesTeclado
+            cmp al, espacio ;AL actualmente posee el ascii de la tecla ingresada
+            je retornar
+            jmp pedirTecla 
+        retornar:  
+            POP AX
+            ret
+    solicitarTeclaEspacio endp
 
     pintarPos proc
        PUSH SI

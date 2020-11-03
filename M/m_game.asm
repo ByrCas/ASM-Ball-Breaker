@@ -32,6 +32,106 @@
 ;			
 ;			JMP CHECK_TIME ;after everything checks time again
 
+chequearCambios macro
+    LOCAL chequear, desplazar, establecer, fin
+    call establecerSegmentoDatos
+    chequear:
+        MOV AH,2Ch ;get the system time
+        INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
+        
+        CMP Dl,DS:[Configurador.tiempoActual]  ;is the current time equal to the previous one(TIME_AUX)?
+        JE chequear    ;if it is the same, check again
+        ;if it's different, then draw, move, etc.
+        MOV DS:[Configurador.tiempoActual],Dl ;update time
+        PUSH CX; se guarda CX por algun otro proceso que lo este empleando durante el juego
+        MOV cl, DS:[Configurador.nivelActual]
+        desplazar:
+            dec cl
+            desplazarPelota
+            desplazarPelota
+            cmp cl, 0 
+            je establecer
+            jmp desplazar 
+        establecer:    
+            call establecerSegmentoDatos
+            POP CX; recuperamos su valor
+            cmp cl, 10
+            je fin
+            JMP chequear ;after everything checks time again
+    fin:
+endm
+
+desplazarPelota macro 
+    LOCAL desplazarNoreste, desplazarNoroeste, desplazarSureste, desplazarSuroeste, fin
+    PUSH AX; se usara el registro al, pero se usa la pila para no alterar su valor de uso en otras macros 
+    call borrarPelotaActual
+    call establecerSegmentoDatos
+    cmp pelota.estadoDireccion, direccionNoresteActiva
+    je desplazarNoreste
+    cmp pelota.estadoDireccion, direccionNoroesteActiva
+    je desplazarNoroeste
+    cmp pelota.estadoDireccion, direccionSuresteActiva
+    je desplazarSureste
+    cmp pelota.estadoDireccion, direccionSuroesteActiva
+    je desplazarSuroeste
+    desplazarNoroeste:
+        MOV pelota.estadoDireccion, direccionNoroesteActiva ;aseguramos la dirección en uso
+        MOV ax, pelota.columnaActual ;como se mueve a lado derecho se debe incluir su ancho para llegar al tope
+        dec ax ;si esta a usa posición del tope izquierdo se cambia dirección
+        cmp ax, posMargenMinimoVertical
+        je desplazarNoreste;activamos su inversa si llegó al tope derecho
+        MOV ax, pelota.filaActual
+        dec ax  ;si esta a usa posición del tope superior se cambia dirección
+        cmp ax, posMargenMinimoHorizontal
+        je  desplazarSuroeste
+        dec pelota.filaActual
+        dec pelota.columnaActual
+        jmp fin
+    desplazarNoreste:
+        MOV pelota.estadoDireccion, direccionNoresteActiva ;aseguramos la dirección en uso
+        MOV ax, pelota.pixelesAncho ;como se mueve a lado derecho se debe incluir su ancho para llegar al tope
+        ADD ax, pelota.columnaActual ;el ancho mas la columna actual, si es igual al margen estará topanpo
+        cmp ax, posMargenMaximoVertical
+        je desplazarNoroeste;activamos su inversa si llegó al tope derecho
+        MOV ax, pelota.filaActual
+        dec ax  ;si esta a usa posición del tope superior se cambia dirección
+        cmp ax, posMargenMinimoHorizontal
+        je  desplazarSureste
+        dec pelota.filaActual
+        inc pelota.columnaActual
+        jmp fin
+    desplazarSureste:
+        MOV pelota.estadoDireccion, direccionSuresteActiva ;aseguramos la dirección en uso
+        MOV ax, pelota.pixelesAncho ;como se mueve a lado derecho se debe incluir su ancho para llegar al tope
+        ADD ax, pelota.columnaActual ;el ancho mas la columna actual, si es igual al margen estará topanpo
+        cmp ax, posMargenMaximoVertical
+        je desplazarSuroeste;activamos su inversa si llegó al tope derecho
+        MOV ax, pelota.filaActual
+        ADD ax, pelota.pixelesAlto; se considera el espacio que ocupa de alto la pelota
+        cmp ax, posMargenMaximoHorizontal
+        je  desplazarNoreste
+        inc pelota.filaActual
+        inc pelota.columnaActual
+        jmp fin
+    desplazarSuroeste:
+        MOV pelota.estadoDireccion, direccionSuroesteActiva ;aseguramos la dirección en uso
+        MOV ax, pelota.columnaActual ;como se mueve a lado izquierdo para llegar al tope
+        dec ax ;si esta a usa posición del tope izquierdo se cambia dirección
+        cmp ax, posMargenMinimoVertical
+        je desplazarSureste;activamos su inversa si llegó al tope derecho
+        MOV ax, pelota.filaActual
+        ADD ax, pelota.pixelesAlto; se considera el espacio que ocupa de alto la pelota
+        cmp ax, posMargenMaximoHorizontal
+        je  desplazarNoroeste
+        inc pelota.filaActual
+        dec pelota.columnaActual
+        jmp fin
+    fin:
+        call establecerDireccionVideo
+        call dibujarPelotaEstandar
+        POP AX ;obtenemos su valor original
+
+endm
 
 
 actualizarDatosPartida macro nivel, puntaje, tiempo

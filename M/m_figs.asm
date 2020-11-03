@@ -29,6 +29,20 @@ pintarBytePixel macro color, posFila, posColumna
     POP SI
 endm
 
+obtenerColorPixel macro
+;CX = Columna del pixel que nos interesa (coordenada gráfica x).
+;DX = Fila del pixel que nos interesa (coordenada gráfica y).
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    MOV AH, 0DH
+    MOV BH, 00h;num pagina
+    
+    POP DX
+    POP CX
+    POP BX
+endm
+
 limpiarEscenario macro
     LOCAL pintar, final
     PUSH CX
@@ -87,7 +101,7 @@ dibujarLineaHorizontal macro
 endm
 
 dibujarBloque macro
-    ;En base a las posciones que se delimiten en los registros se dibuja el elemento
+    ;En base a las posiciones que se delimiten en los registros se dibuja el elemento
     LOCAL dibujar, final
     PUSH CX
     MOV cl, 0
@@ -106,19 +120,43 @@ dibujarBloque macro
         POP CX
 endm
 
+borrarBloque macro
+    ;En base a las posiciones que se delimiten en los registros se dborrará el elemento
+    ;se coloca el color de fondo, no es en si una limpieza pura
+    LOCAL dibujar, final
+    PUSH CX
+    PUSH DX
+    MOV cl, 0
+    MOV dl, colorNegroGrafico
+    dibujar:
+        PUSH AX;durante el trazado del dibujo estos registros se emplean, 
+        PUSH BX ;por lo que guardamos su valor original
+        dibujarLineaHorizontal  
+        POP BX ;ahora podemos obtener la fila y columna originales orevias
+        POP AX
+        inc ax ;se incrementa la fila para que avance verticalmente
+        inc cl
+        cmp cl, alturaBloque;Es el número de lineas que formasn un bloque
+        je final
+        jmp dibujar
+    final:
+        POP DX
+        POP CX
+endm
+
 dibujarContornosVerticales macro
     ;Nos posicionamos en la fila ax u en la columna bx,
     ;y con di indicamos cuantos pixeles vamos a pintar
     ;verticalmente a partir de ese punto
     MOV dl, colorBlancoGrafico
-    MOV ax, 19;0f; 159
-    MOV bx, 5 ;63h; 99
-    MOV di, 175
+    MOV ax, posMargenMinimoHorizontal
+    MOV bx, posMargenMinimoVertical
+    MOV di, longitudMargenVertical
     dibujarLineaVertical  
-    MOV dl, colorBlancoGrafico
-    MOV ax, 19;0f; 159
-    MOV bx, 314 ;63h; 99
-    MOV di, 175
+    ;MOV dl, colorBlancoGrafico
+    MOV ax, posMargenMinimoHorizontal
+    MOV bx, posMargenMaximoVertical
+    MOV di, longitudMargenVertical
     dibujarLineaVertical 
 endm
 
@@ -127,14 +165,14 @@ dibujarContornosHorizontales macro
     ;y con di indicamos cuantos pixeles vamos a pintar
     ;horizontalmente a partir de ese punto
     MOV dl, colorBlancoGrafico
-    MOV ax, 19;0f; 159
-    MOV bx, 5 ;63h; 99
-    MOV di, 310
+    MOV ax, posMargenMinimoHorizontal
+    MOV bx, posMargenMinimoVertical
+    MOV di, longitudMargenHorizontal
     dibujarLineaHorizontal
-    MOV dl, colorBlancoGrafico
-    MOV ax, 194;0f; 159
-    MOV bx, 5 ;63h; 99
-    MOV di, 310
+   ; MOV dl, colorBlancoGrafico
+    MOV ax, posMargenMaximoHorizontal
+    MOV bx, posMargenMinimoVertical
+    MOV di, longitudMargenHorizontal
     dibujarLineaHorizontal
 endm
 
