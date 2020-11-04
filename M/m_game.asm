@@ -33,18 +33,19 @@
 ;			JMP CHECK_TIME ;after everything checks time again
 
 chequearCambios macro
-    LOCAL chequear, desplazar, establecer, fin
+    LOCAL chequear,evaluarTecla, desplazar, establecer, fin
     call establecerSegmentoDatos
+    PUSH BX
     chequear:
-        MOV AH,2Ch ;get the system time
-        INT 21h    ;CH = hour CL = minute DH = second DL = 1/100 seconds
-        
-        CMP Dl,DS:[Configurador.tiempoActual]  ;is the current time equal to the previous one(TIME_AUX)?
-        JE chequear    ;if it is the same, check again
-        ;if it's different, then draw, move, etc.
+        MOV AH,subFuncionTiempoSistema ;obtenemos el tiempo del sistema
+        INT funcionesDOS;CH = hour CL = minute DH = second DL = 1/100 seconds  
+        CMP Dl,DS:[Configurador.tiempoActual]  ;Si el milisegundo ecaluado es igual o no al anteriro
+        JE chequear    ;Si es igual vuelve a evaluar, si no entonces realiza todo lo demás
         MOV DS:[Configurador.tiempoActual],Dl ;update time
         PUSH CX; se guarda CX por algun otro proceso que lo este empleando durante el juego
         MOV cl, DS:[Configurador.nivelActual]
+        evaluarTecla:
+            desplazarPlataforma
         desplazar:
             dec cl
             desplazarPelota
@@ -53,19 +54,22 @@ chequearCambios macro
             je establecer
             jmp desplazar 
         establecer:    
-            call establecerSegmentoDatos
+            call establecerSegmentoDatos; se establece ese segmento para las siguiedntes acciones
+            ;y por si se debe volver a chequear
             POP CX; recuperamos su valor
-            cmp cl, 10
+            MOV bl, indicadorJuegoInactivo 
+            cmp bl, DS:[Configurador.estadoJuego]
             je fin
-            JMP chequear ;after everything checks time again
+            JMP chequear ;volvemos a evaluar
     fin:
+        POP BX
 endm
 
 desplazarPelota macro 
     LOCAL desplazarNoreste, desplazarNoroeste, desplazarSureste, desplazarSuroeste, fin
     PUSH AX; se usara el registro al, pero se usa la pila para no alterar su valor de uso en otras macros 
-    call borrarPelotaActual
-    call establecerSegmentoDatos
+    call borrarPelotaActual ;esto borraráel biujo actual de la peloya (asi no dejará rastro)
+    call establecerSegmentoDatos;necesitamos esa ubicación para el uso de las variables
     cmp pelota.estadoDireccion, direccionNoresteActiva
     je desplazarNoreste
     cmp pelota.estadoDireccion, direccionNoroesteActiva
@@ -130,8 +134,52 @@ desplazarPelota macro
         call establecerDireccionVideo
         call dibujarPelotaEstandar
         POP AX ;obtenemos su valor original
-
 endm
+
+desplazarPlataforma macro
+    LOCAL evaluarTeclaActiva,evaluarPausa, evaluarTopeIzquierdo, evaluarTopeDerecho, desplazarIzquierda, desplazarDerecha, fin
+    PUSH AX
+    evaluarTeclaActiva:
+        XOR ax, ax
+        MOV ah, subFuncionEstadoTeclado; solo verifica si se ingreso una tecla
+        int funcionesTeclado; la bandera zero se alrtera a 1 si no fue presionado nada
+        jz fin;si bandera Z=1,como no fue presionado nada no se busca ejecutar lo demás
+        cmp al, teclaMinusculaA
+        je evaluarTopeIzquierdo
+        cmp al, teclaMinusculaD
+        je evaluarTopeDerecho
+        cmp al, teclaMinusculaP; se considerará como acceso a la pausa del juego
+        je evaluarPausa
+        jmp fin;
+    ;ejecución de pausa:
+    evaluarPausa:
+        call retenerPausaEvaluada
+        ;call solicitarTeclaEspacio
+        jmp fin
+    ;Movimientos plataforma:    
+    evaluarTopeIzquierdo:
+        MOV ax, plataformaMovible.columnaActual
+        dec ax;ax será la columna del margen minimo vertical si se encuentra la plataforma a la par;
+        cmp ax, posMargenMinimoVertical
+        je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve    
+    desplazarIzquierda:
+        call moverLadoIzquierdoPlataforma
+        jmp fin
+    evaluarTopeDerecho:
+        MOV ax, plataformaMovible.columnaActual
+        add ax, plataformaMovible.pixelesAncho
+        ;ax será la columna del margen maximo vertical si se encuentra la plataforma a la par
+        ;ya que es el lado derecho se considerá el ancho de la plataforma
+        cmp ax, posMargenMaximoVertical
+        je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve 
+    desplazarDerecha:
+        call moverLadoDerechoPlataforma
+        jmp fin
+    fin:
+        call limpiarBufferEntradaTeclado
+        POP AX
+endm
+
 
 
 actualizarDatosPartida macro nivel, puntaje, tiempo

@@ -33,6 +33,9 @@ puntoComa EQU 3bh ;3bh-> 59 -> ;
 espacio EQU 20h;20h->32 -> espacio en blanco  
 finRutaFichero EQU 0h ;0h-> 0 -> 0 
 finCadena EQU 24h ;24h-> 36 -> $
+teclaMinusculaA EQU 61h; 61h -> 91 -> "a"
+teclaMinusculaD EQU 64h; 64h -> 91 -> "d"
+teclaMinusculaP EQU 70h; 70h-> 112 -> "p"
 
 ;Dimensiones y longitudes:
 dimensionLectorTeclado EQU 14h; 20D 
@@ -57,6 +60,10 @@ tamanioFila EQU 320 ;el tamaño de fila es de 320 columnas en el modo video 13h,
 alturaBloque EQU 5 ;Es el número de lineas que formasn un bloque
 alturaPelota EQU 3 ;Es el número de lineas que formasn una pelota
 posicionBaseBarraGrafica EQU 175 ;fila base desde donde se generará la barra hacia arriba
+indicadorJuegoActivo EQU 01h; indicará activad del juego (se esta jugando)
+indicadorJuegoInactivo EQU 00h; indicará inactivad del juego (no se esta jugando)
+indicadorPartidaGanada EQU 01h; indicará que superó todos los niveles del juego
+indicadorPartidaPerdida EQU 00h; indicará que perdió la partida, sin importsar en que nivel
 
 ;Coordenadas Base:
 posMargenMinimoVertical EQU 5 ;columna donde se ubica el margen minimo vertical
@@ -95,14 +102,16 @@ subFuncionAbrirFichero EQU 3dh ;3dh -> 61 -> Abrir Fichero
 subFuncionCerrarFichero EQU 3eh; 3eh-> 62 -> Cerrar Archivo
 subFuncionLeerFichero EQU 3fh ;3fh -> 63 -> Lectura de Fichero o dispositivo
 subFuncionAdjuntarInfoFichero EQU 40h ;40h -> 64 -> Escritura(Adjuntada) en Fichero o dispositivo.
+subFuncionLimpiezaBuffer EQU 0Ch; 0ch -> 12 -> limpia el buffer y permite asiganr una función en AL 
+subFuncionTiempoSistema EQU 2ch ;2ch -> 44 -> Obtiene la hora del sustema y guarda en los registros sus distnots valores 
 subFuncionFinPrograma EQU 4ch ;4ch -> 76 -> Terminación de Programa con Código de Retorno 
 funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS 
 
 subFuncionModoVideo EQU 00h ;00h->0->Establecer modo de video
 funcionesDespligueVideo EQU 10h ;10h -> 16 -> funciones de modo gráfico o video
 
-subFuncionSolicitudTeclado EQU 01h;1h -> 1 -> guarda la tecla ingresada por teclado en AL
-subFuncionEstadoTeclado EQU 10h;10h -> 16 -> verifica el estado del teclado para ver si se ingresaron teclas o no mediante el valor de CF(carry flag)
+subFuncionSolicitudTeclado EQU 00h;1h -> 1 -> guarda la tecla ingresada por teclado en AL
+subFuncionEstadoTeclado EQU 01h;10h -> 16 -> verifica el estado del teclado para ver si se ingresaron teclas o no mediante el valor de CF(carry flag)
 funcionesTeclado EQU 16h ;16h -> 22 ->  Servicios de Entrada y Salida de teclado
    
 ;=== VECTORES ===            
@@ -197,6 +206,8 @@ Configurador STRUC
    nivelActual db ?
    puntajeActual db ?
    tiempoActual db ?
+   estadoJuego db ?; 00h juego inactivo, 01h juego activo
+   estadoPartida db ?; 00h partiuda perdida, 01h partida ganada
 Configurador ENDS 
 ;Guarda toda la configuracio´n de los niveles del Ball Breaker
 
@@ -231,16 +242,18 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
 ;================== SEGMENTO DE CODIGO ===========================
 .code 
         call establecerSegmentoDatos
-        call establecerValoresInicialesPartida
-        call establecerModoVideo
-        call pintarPrimerNivel
+        ;call establecerValoresInicialesPartida
+        ;call establecerModoVideo
+        ;call pintarPrimerNivel
+
         ;limpiarEscenario
         ;call pintarSegundoNivel
         ;limpiarEscenario
         ;call pintarTercerNivel
         ;call barraDib
-        call solicitarTeclaEspacio
-        call establecerModoTexto
+        
+        ;call solicitarTeclaEspacio
+        ;call establecerModoTexto
 	main proc 
 	    IniciarPrograma:
 		    mostrarEncabezado
@@ -264,6 +277,10 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
              obtenerLecturaOpcionTop             
 		iniciarJuego:
 		    imprimirEnConsola inicioJuego 
+            call establecerValoresInicialesPartida
+            call establecerModoVideo
+            call pintarPrimerNivel
+            call establecerModoTexto
 		    jmp  menuInicial    
 		Salir: 
 			salirPrograma  
@@ -286,6 +303,8 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             imprimirEnConsola aperturaArchivoErronea
             jmp  menuInicial
 	main endp
+
+    ;==================    PROCEDIMIENTOS:    ============================
 
     establecerSegmentoDatos proc
         asignarDIreccionDatos:
@@ -323,6 +342,9 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
     establecerValoresInicialesPartida proc
         MOV DS:[Configurador.tiempoActual],0
         MOV DS:[Configurador.nivelActual],1
+        MOV DS:[Configurador.estadoJuego], indicadorJuegoActivo
+        MOV DS:[Configurador.estadoPartida], indicadorPartidaPerdida
+        ret 
     establecerValoresInicialesPartida endp
 
     dibujarMarcoGrafico proc
@@ -338,7 +360,15 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         dibujarCaparazon
         call solicitarTeclaEspacio
         chequearCambios 
-        ret
+        cmp  DS:[Configurador.estadoJuego],indicadorPartidaGanada
+        je subirNivel
+        cmp  DS:[Configurador.estadoPartida],indicadorPartidaPerdida
+        je regresarMenuPrincipal
+        subirNivel:
+            call pintarSegundoNivel
+        regresarMenuPrincipal:
+            ;**agregar datos a archvios**
+            ret ;si pierde alguno de los niveles regresa al menu principal
     pintarPrimerNivel endp
 
     pintarSegundoNivel proc
@@ -376,6 +406,16 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         ret
     dibujarPlataforma endp
 
+    borrarPlataformaActual proc
+        call establecerSegmentoDatos
+        MOV di, plataformaMovible.pixelesAncho ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV ax, plataformaMovible.filaActual
+        MOV bx, plataformaMovible.columnaActual
+        call establecerDireccionVideo
+        borrarBloque
+        ret
+    borrarPlataformaActual endp
+
     dibujarPelotaEstandar proc
         call establecerSegmentoDatos
         MOV di, pelota.pixelesAncho ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
@@ -397,11 +437,11 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         ret
     borrarPelotaActual endp
 
-    barraDib proc
-        call dibujarMarcoGrafico
-        probarBarra
-        ret
-    barraDib endp
+    ;barraDib proc
+    ;    call dibujarMarcoGrafico
+    ;    probarBarra
+    ;    ret
+    ;barraDib endp
 
     solicitarTeclaEspacio proc
         PUSH AX
@@ -417,32 +457,52 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             ret
     solicitarTeclaEspacio endp
 
-    pintarPos proc
-       PUSH SI
-       PUSH DI
-       PUSH AX
-       PUSH BX
-       PUSH CX  ;Se empujan los elementos ya que todos tendran otro uso durante el juego
-       PUSH DX  ; y no se debe perder o alterar su valor actual
-       MOV dl, 0fh
-       MOV ax, 99;0f; 159
-       MOV bx, 159 ;63h; 99
-       pintarBytePixel dl, ax ,bx
-        pedirTecla:
-            ; esperar por tecla
-            mov ah,10h
-            int 16h  
-       POP DX
-       POP CX
-       POP BX
-       POP AX
-       POP DI
-       POP SI 
+    limpiarBufferEntradaTeclado proc
+    ;Normalemnte a al se le asigna un función, como en este caso solo buscamos limpiar el buffer no se le asigna nada
+        PUSH AX
+        MOV ah, subFuncionLimpiezaBuffer
+        int funcionesDOS
+        POP AX
         ret
-    pintarPos endp
+    limpiarBufferEntradaTeclado endp
 
-    
+    moverLadoIzquierdoPlataforma proc
+        call borrarPlataformaActual
+        call establecerSegmentoDatos
+        dec  plataformaMovible.columnaActual
+        call establecerDireccionVideo
+        call dibujarPlataforma
+        ret
+    moverLadoIzquierdoPlataforma endp  
 
-    
+    moverLadoDerechoPlataforma proc
+        call borrarPlataformaActual
+        call establecerSegmentoDatos
+        inc  plataformaMovible.columnaActual
+        call establecerDireccionVideo
+        call dibujarPlataforma
+        ret
+    moverLadoDerechoPlataforma endp  
+
+    retenerPausaEvaluada proc
+        PUSH AX
+        call limpiarBufferEntradaTeclado; se limpia el buffer para no volver a evaluar lo previo ingresado
+        pedirOpcionTecla:
+            ;esperar por tecla
+            mov ah,subFuncionSolicitudTeclado
+            int funcionesTeclado
+            cmp al, espacio ;AL actualmente posee el ascii de la tecla ingresada
+            je asignarRegreso
+            cmp al, teclaMinusculaP ;AL actualmente posee el ascii de la tecla ingresada
+            je reanudarJuego
+            jmp pedirOpcionTecla 
+        asignarRegreso:; cambia el indicaodr para que se sepa que debe finalizar el jeugo  
+            ;call establecerSegmentoDatos
+            ;call establecerModoTexto
+            MOV DS:[Configurador.estadoJuego], indicadorJuegoInactivo
+        reanudarJuego:
+            POP AX
+            ret ;retornará al punto donde fue llamdo (en la evaluación de teclas del jeugo, para proseguir con él)
+    retenerPausaEvaluada endp
 
 end
