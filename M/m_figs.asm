@@ -22,25 +22,13 @@ pintarBytePixel macro color, posFila, posColumna
     MOV di, ax
     POP DX  ;recuperamos el valor del color original de dl
     mov [di], dl
+    ;call establecerSegmentoDatos
+    ;MOV DS:[Configurador.controladorDeColores[di]], dl
     POP AX
     POP BX
     POP CX
     POP DI
     POP SI
-endm
-
-obtenerColorPixel macro
-;CX = Columna del pixel que nos interesa (coordenada gráfica x).
-;DX = Fila del pixel que nos interesa (coordenada gráfica y).
-    PUSH BX
-    PUSH CX
-    PUSH DX
-    MOV AH, 0DH
-    MOV BH, 00h;num pagina
-    
-    POP DX
-    POP CX
-    POP BX
 endm
 
 limpiarEscenario macro

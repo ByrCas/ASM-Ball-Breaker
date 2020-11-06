@@ -33,7 +33,7 @@
 ;			JMP CHECK_TIME ;after everything checks time again
 
 chequearCambios macro
-    LOCAL chequear,evaluarTecla, desplazar, establecer, fin
+    LOCAL chequear,evaluarTecla, desplazar, destruccion, establecer, fin
     call establecerSegmentoDatos
     PUSH BX
     chequear:
@@ -43,18 +43,30 @@ chequearCambios macro
         JE chequear    ;Si es igual vuelve a evaluar, si no entonces realiza todo lo demás
         MOV DS:[Configurador.tiempoActual],Dl ;update time
         PUSH CX; se guarda CX por algun otro proceso que lo este empleando durante el juego
-        MOV cl, DS:[Configurador.nivelActual]
+        destruccion:
+            call delimitarSecuenciaDestruccionBloques
+            MOV cl, DS:[Configurador.nivelActual]
+            MOV ch, DS:[Configurador.nivelActual]
+            ;Se les asigna el indicador de nivel ya que mediante su valor se harán N iteraciones,
+            ;esto permite que solo se cambie su valor con el paso de nivel y automáticamente
+            ;se desplazarán mas veces, viendose asi mas veloz en pantalla
         evaluarTecla:
-            desplazarPlataforma
+            dec ch
+            evaluarAccionesDeTeclas; incluye pausa y movimientos de plataforma
+            evaluarAccionesDeTeclas;se evalua dos veces para un mayor movimiento y aumentar velocidad
+            cmp ch, 0 
+            je desplazar
+            jmp evaluarTecla 
         desplazar:
             dec cl
             desplazarPelota
-            desplazarPelota
+            desplazarPelota;se evalua dos veces para un mayor movimiento y aumentar velocidad
             cmp cl, 0 
             je establecer
             jmp desplazar 
         establecer:    
-            call establecerSegmentoDatos; se establece ese segmento para las siguiedntes acciones
+            call establecerSegmentoDatos
+            ; se establece ese segmento para las siguiedntes acciones
             ;y por si se debe volver a chequear
             POP CX; recuperamos su valor
             MOV bl, indicadorJuegoInactivo 
@@ -136,7 +148,7 @@ desplazarPelota macro
         POP AX ;obtenemos su valor original
 endm
 
-desplazarPlataforma macro
+evaluarAccionesDeTeclas macro
     LOCAL evaluarTeclaActiva,evaluarPausa, evaluarTopeIzquierdo, evaluarTopeDerecho, desplazarIzquierda, desplazarDerecha, fin
     PUSH AX
     evaluarTeclaActiva:
@@ -151,12 +163,11 @@ desplazarPlataforma macro
         cmp al, teclaMinusculaP; se considerará como acceso a la pausa del juego
         je evaluarPausa
         jmp fin;
-    ;ejecución de pausa:
+    ;EJECUCIÓN DE PAUSA:
     evaluarPausa:
         call retenerPausaEvaluada
-        ;call solicitarTeclaEspacio
         jmp fin
-    ;Movimientos plataforma:    
+    ;MOVIMIENTOS PLATAFORMA:    
     evaluarTopeIzquierdo:
         MOV ax, plataformaMovible.columnaActual
         dec ax;ax será la columna del margen minimo vertical si se encuentra la plataforma a la par;
@@ -180,7 +191,120 @@ desplazarPlataforma macro
         POP AX
 endm
 
+evaluarRebotesVerticalesDestructivos macro  
+    LOCAL evaluacionVertical, evaluarLadoSuperior, evaluarLadoinferior, retenerColumnaMaxima, asignarColumna,  evaluarColor, destruccion, reevaluacion, fin
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    call establecerSegmentoDatos
+    evaluacionVertical:
+        cmp pelota.estadoDireccion, direccionNoresteActiva
+        je evaluarLadoSuperior
+        cmp pelota.estadoDireccion, direccionNoroesteActiva
+        je evaluarLadoSuperior
+        cmp pelota.estadoDireccion, direccionSuresteActiva
+        je evaluarLadoinferior
+        cmp pelota.estadoDireccion, direccionSuroesteActiva
+        je evaluarLadoinferior
+    evaluarLadoSuperior:
+        MOV bx, pelota.filaActual
+        dec bx
+        MOV dx, bx 
+        jmp asignarColumna
+    evaluarLadoinferior:
+        MOV bx, pelota.filaActual
+        ADD bx, pelota.pixelesAlto
+        MOV dx, bx
+    asignarColumna:
+        MOV cx, pelota.columnaActual
+    retenerColumnaMaxima:
+        MOV ax, pelota.columnaActual
+        ADD ax, pelota.pixelesAncho
+        PUSH AX 
+    evaluarColor:
+        call establecerDireccionVideo
+        call obtenerColorPixel
+        ;call obtenerColorPorMatrizControl
+        call establecerSegmentoDatos
+        cmp al, colorNegroGrafico
+        je reevaluacion 
+        jmp destruccion
+    destruccion:
+        call destruirBloqueDesdeOrigen
+        jmp fin
+    reevaluacion:
+        inc cx
+        POP AX
+        PUSH AX
+        cmp cx, ax
+        je fin
+        jmp evaluarColor
+    fin:
+        POP CX
+        POP DX
+        POP CX
+        POP BX
+        POP AX
+endm
 
+evaluarRebotesHorizontalesDestructivos macro  
+    LOCAL evaluacionHorizontal, evaluarLadoIzquierdo, evaluarLadoDerecho, retenerFilaMaxima, asignarFila,  evaluarColor, destruccion, reevaluacion, fin
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    PUSH DX
+    call establecerSegmentoDatos
+    evaluacionHorizontal: 
+        call establecerSegmentoDatos
+        cmp pelota.estadoDireccion, direccionNoresteActiva
+        je evaluarLadoDerecho
+        cmp pelota.estadoDireccion, direccionNoroesteActiva
+        je evaluarLadoIzquierdo
+        cmp pelota.estadoDireccion, direccionSuresteActiva
+        je evaluarLadoDerecho
+        cmp pelota.estadoDireccion, direccionSuroesteActiva
+        je evaluarLadoIzquierdo
+    evaluarLadoIzquierdo:
+        MOV bx, pelota.columnaActual
+        dec bx
+        MOV cx, bx 
+        jmp asignarFila
+    evaluarLadoDerecho:
+        MOV bx, pelota.columnaActual
+        ADD bx, pelota.pixelesAncho
+        MOV cx, bx
+    asignarFila:
+        MOV dx, pelota.filaActual
+    retenerFilaMaxima:
+        MOV ax, pelota.filaActual
+        ADD ax, pelota.pixelesAlto
+        PUSH AX 
+    evaluarColor:
+        call establecerDireccionVideo
+        call obtenerColorPixel
+        ;call obtenerColorPorMatrizControl
+        call establecerSegmentoDatos
+        cmp al, colorNegroGrafico
+        je reevaluacion 
+        jmp destruccion
+    destruccion:
+        call destruirBloqueDesdeOrigen
+        jmp fin
+    reevaluacion:
+        inc dx
+        POP AX
+        PUSH AX
+        cmp dx, ax
+        je fin
+        jmp evaluarColor
+    fin:
+        POP DX
+        POP DX
+        POP CX
+        POP BX
+        POP AX
+endm
 
 actualizarDatosPartida macro nivel, puntaje, tiempo
     MOV DS:[Configurador.nivelActual], nivel

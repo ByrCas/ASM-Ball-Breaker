@@ -1,7 +1,7 @@
 
 
 dibujarCaparazon macro ;obstaculos de nivel 1
-    MOV di, 20 ; las lineas horizontales del bloque tendran 20 pixeles de longitud
+    MOV di, anchoBloque ; las lineas horizontales del bloque tendran 20 pixeles de longitud
     dibujarContornoCaparazon
     dibujarPrimeraCapaCaparazon
     dibujarSegundaCapaCaparazon
@@ -10,14 +10,14 @@ dibujarCaparazon macro ;obstaculos de nivel 1
 endm
 
 dibujarCaja macro 
-    MOV di, 20 ; las lineas horizontales del bloque tendran 20 pixeles de longitud
+    MOV di, anchoBloque ; las lineas horizontales del bloque tendran 20 pixeles de longitud
     dibujarInterrogacion
     dibujarBordesHorizontales
     dibujarBordesVerticales
 endm
 
 dibujarMensajeColorido macro
-    MOV di, 20 ; las lineas horizontales del bloque tendran 20 pixeles de longitud
+    MOV di, anchoBloque ; las lineas horizontales del bloque tendran 20 pixeles de longitud
     dibujarLetraA
     dibujarLetraR
     dibujarLetraQ

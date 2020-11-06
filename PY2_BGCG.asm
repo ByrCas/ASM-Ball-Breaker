@@ -58,12 +58,16 @@ direccionBaseMemoriaGrafica EQU 0A000h; Sirve para establecwer a DS la dir. de m
 pixelesTotales EQU 0FA00h; 64,000 pixeles en ese modo de resolución 320 * 200
 tamanioFila EQU 320 ;el tamaño de fila es de 320 columnas en el modo video 13h, se emplea para ubicar la matriz linealizada/mapeada en memoria
 alturaBloque EQU 5 ;Es el número de lineas que formasn un bloque
+anchoBloque EQU 20 ;Es lunmero de pixeles en columna que forman el bloque
 alturaPelota EQU 3 ;Es el número de lineas que formasn una pelota
 posicionBaseBarraGrafica EQU 175 ;fila base desde donde se generará la barra hacia arriba
 indicadorJuegoActivo EQU 01h; indicará activad del juego (se esta jugando)
 indicadorJuegoInactivo EQU 00h; indicará inactivad del juego (no se esta jugando)
 indicadorPartidaGanada EQU 01h; indicará que superó todos los niveles del juego
 indicadorPartidaPerdida EQU 00h; indicará que perdió la partida, sin importsar en que nivel
+indicadorBloqueEliminado EQU 01h; indicará que un bloque ya se eliminó, evita evaluaciones innecesarias y aumenta la fluidez de la ejecución
+indicadorBloqueActivo EQU 00h;
+extensorPlataforma EQU 3; sirve como base para un iterador que permite mover mas veces la plataforma por milisegundo y dar asi mayopr velocidad a la misma
 
 ;Coordenadas Base:
 posMargenMinimoVertical EQU 5 ;columna donde se ubica el margen minimo vertical
@@ -108,6 +112,7 @@ subFuncionFinPrograma EQU 4ch ;4ch -> 76 -> Terminación de Programa con Código
 funcionesDOS EQU 21h ;21h -> 33 -> petición de función al DOS 
 
 subFuncionModoVideo EQU 00h ;00h->0->Establecer modo de video
+subFuncionObtenerColor EQU  0DH ;0DH 13 obtiene el color del pixel en modos de video
 funcionesDespligueVideo EQU 10h ;10h -> 16 -> funciones de modo gráfico o video
 
 subFuncionSolicitudTeclado EQU 00h;1h -> 1 -> guarda la tecla ingresada por teclado en AL
@@ -208,6 +213,8 @@ Configurador STRUC
    tiempoActual db ?
    estadoJuego db ?; 00h juego inactivo, 01h juego activo
    estadoPartida db ?; 00h partiuda perdida, 01h partida ganada
+   controladorDeColores db 64000 dup(colorNegroGrafico);
+   controladorBloque db ? 
 Configurador ENDS 
 ;Guarda toda la configuracio´n de los niveles del Ball Breaker
 
@@ -307,9 +314,11 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
     ;==================    PROCEDIMIENTOS:    ============================
 
     establecerSegmentoDatos proc
+        PUSH DX
         asignarDIreccionDatos:
             MOV dx,@data ; Dirección del segmento de datos para poder acceder a las variables
             MOV ds,dx 
+        POP DX
         ret 
     establecerSegmentoDatos endp
 
@@ -322,11 +331,13 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
     establecerDireccionVideo endp  
     
     establecerModoVideo proc
+        PUSH AX
         asignarDIreccionDatos:
             MOV ax, modoVideoGrafico
             int funcionesDespligueVideo
             MOV ax, direccionBaseMemoriaGrafica 
-            MOV ds,ax 
+            MOV ds,ax
+        POP AX 
         ret 
     establecerModoVideo endp
 
@@ -352,6 +363,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         dibujarContornosHorizontales
         ret
     dibujarMarcoGrafico endp
+
         
     pintarPrimerNivel proc
         call dibujarMarcoGrafico
@@ -467,22 +479,135 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
     limpiarBufferEntradaTeclado endp
 
     moverLadoIzquierdoPlataforma proc
-        call borrarPlataformaActual
-        call establecerSegmentoDatos
-        dec  plataformaMovible.columnaActual
-        call establecerDireccionVideo
-        call dibujarPlataforma
-        ret
+        PUSH CX
+        moverIzquierda:
+            call borrarPlataformaActual
+            call establecerSegmentoDatos
+            dec  plataformaMovible.columnaActual
+            call establecerDireccionVideo
+            call dibujarPlataforma
+        fin:    
+            POP CX    
+            ret
     moverLadoIzquierdoPlataforma endp  
 
     moverLadoDerechoPlataforma proc
-        call borrarPlataformaActual
-        call establecerSegmentoDatos
-        inc  plataformaMovible.columnaActual
-        call establecerDireccionVideo
-        call dibujarPlataforma
-        ret
+        PUSH CX
+        moverDerecha:
+            call borrarPlataformaActual
+            call establecerSegmentoDatos
+            inc  plataformaMovible.columnaActual
+            call establecerDireccionVideo
+            call dibujarPlataforma
+        fin: 
+            POP CX   
+            ret
     moverLadoDerechoPlataforma endp  
+
+    obtenerColorPixel proc
+        MOV AH,subFuncionObtenerColor  
+        MOV BH, 00h; La única página que se utiliza
+        int funcionesDespligueVideo
+        ret
+    obtenerColorPixel endp
+
+    obtenerColorPorMatrizControl proc
+        ; cx debe tener la columna y dx la fila a verificar por mapeo
+        ;PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        PUSH DI
+        obtenerColorPosicion:
+            MOV ax, dx; ax recibe la fila actual
+            MOV bx, tamanioFila
+            mul bx
+            add ax, cx; ax es sumado con la columna actual
+            MOV di, ax; lo asignamos a DI para usarlo como indice de busqueda
+            MOV al, DS:[Configurador.controladorDeColores[di]]
+        regresarValoresOriginales:
+            POP DI
+            POP DX
+            POP CX
+            POP BX
+            ;POP AX
+            ret
+    obtenerColorPorMatrizControl endp
+
+    destruirBloqueDesdeOrigen proc
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        call establecerDireccionVideo
+        desplazarmeIzquierda:
+            dec cx
+            call obtenerColorPixel
+            ;call obtenerColorPorMatrizControl
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            je restablecerColumnaUtil
+            jmp desplazarmeIzquierda
+        restablecerColumnaUtil:
+            inc cx
+        elevarFila:
+            call establecerDireccionVideo
+            dec dx
+            call obtenerColorPixel
+            ;call obtenerColorPorMatrizControl
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            je restablecerFilaUtil
+            jmp elevarFila
+        restablecerFilaUtil:
+            inc dx 
+        destruirBloque:
+            call establecerDireccionVideo
+            MOV di, anchoBloque ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+            MOV ax, dx  
+            MOV bx, cx
+            MOV dl, colorNegroGrafico
+            ;borrarBloque
+            dibujarBloque
+            call establecerSegmentoDatos
+            MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+            POP DX
+            POP CX
+            POP BX
+            POP AX
+            ret
+    destruirBloqueDesdeOrigen endp
+
+    delimitarSecuenciaDestruccionBloques proc
+        restringirDestruccionLimites:
+            MOV dx, posMargenMinimoVertical
+            inc dx; si estuviera uno antes/a la par del margen minimo vertical se restringe
+            cmp pelota.columnaActual, dx
+            je destruccionFinalizada
+            MOV dx, posMargenMaximoVertical
+            dec dx; si estuviera uno antes/a la par del margen maximo vertical se restringe
+            cmp pelota.columnaActual, dx
+            je destruccionFinalizada
+            MOV dx, posMargenMinimoHorizontal
+            inc dx; si estuviera uno antes/por debajo del margen minimo horizontal se restringe
+            cmp pelota.filaActual, dx
+            je destruccionFinalizada
+            MOV dx, posMargenMaximoHorizontal
+            dec dx; si estuviera uno antes/por endima  del margen maximo vertical se restringe
+            cmp pelota.filaActual, dx
+            je destruccionFinalizada
+        verificarDestruccionVertical:
+            evaluarRebotesVerticalesDestructivos
+            call establecerSegmentoDatos
+            cmp DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+            je destruccionFinalizada
+        verificarDestruccionHorizontal:
+            evaluarRebotesHorizontalesDestructivos
+        destruccionFinalizada:
+            call establecerSegmentoDatos
+            MOV DS:[Configurador.controladorBloque], indicadorBloqueActivo
+            ret
+    delimitarSecuenciaDestruccionBloques endp 
 
     retenerPausaEvaluada proc
         PUSH AX
@@ -496,9 +621,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             cmp al, teclaMinusculaP ;AL actualmente posee el ascii de la tecla ingresada
             je reanudarJuego
             jmp pedirOpcionTecla 
-        asignarRegreso:; cambia el indicaodr para que se sepa que debe finalizar el jeugo  
-            ;call establecerSegmentoDatos
-            ;call establecerModoTexto
+        asignarRegreso:; cambia el indicaodr para que se sepa que debe finalizar el juego    
             MOV DS:[Configurador.estadoJuego], indicadorJuegoInactivo
         reanudarJuego:
             POP AX
