@@ -1,27 +1,33 @@
 
 
 dibujarCaparazon macro ;obstaculos de nivel 1
+    call establecerDireccionVideo
     MOV di, anchoBloque ; las lineas horizontales del bloque tendran 20 pixeles de longitud
     dibujarContornoCaparazon
     dibujarPrimeraCapaCaparazon
     dibujarSegundaCapaCaparazon
     dibujarTerceraCapaCaparazon
     dibujarCuartaCapaCaparazon
+    call establecerSegmentoDatos
 endm
 
 dibujarCaja macro 
+    call establecerDireccionVideo
     MOV di, anchoBloque ; las lineas horizontales del bloque tendran 20 pixeles de longitud
     dibujarInterrogacion
     dibujarBordesHorizontales
     dibujarBordesVerticales
+    call establecerSegmentoDatos
 endm
 
 dibujarMensajeColorido macro
+    call establecerDireccionVideo
     MOV di, anchoBloque ; las lineas horizontales del bloque tendran 20 pixeles de longitud
     dibujarLetraA
     dibujarLetraR
     dibujarLetraQ
     dibujarNumUno
+    call establecerSegmentoDatos
 endm
 
 dibujarContornoCaparazon macro

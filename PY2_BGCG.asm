@@ -50,6 +50,7 @@ modoEstandar EQU 00h; 0 hace referencia a ese modo o tipo estándar en ficheros
 cantidadSeparacion EQU 15 ;sirve como cuenta para los espacios sepradores en los reportes
 inicioAsciiDigito EQU 0030h; es el 0 decimal en ascii
 finAsciiDigito EQU 003ah; se tomará como representación del 10 decimal en ascii
+diferenciaASCII EQU 30h ; es la diferencia de un número a su verdadero ascci
 modoVideoGrafico EQU 13h ;13h -> 19 ->320 x 200 de resolución y 256 colores
 modoTextoEstandar EQU 03h ;03h -> 3 -> Establece el modo texto (se usa para regresar del modo video) 80x25. 16 colores. 8 paginas.
 direccionBaseMemoriaGrafica EQU 0A000h; Sirve para establecwer a DS la dir. de memoria gráfica y optimizar mejor los resultados proyectados en pantalla 1 página
@@ -87,6 +88,12 @@ direccionNoroesteActiva EQU 01h; representación activa de Noreste
 direccionSuresteActiva EQU 02h; representación activa de Noreste
 direccionSuroesteActiva EQU 03h; representación activa de Noreste
 
+;Coordenadas de Titulos en Modo video:
+filaEstandarImpresionVideo EQU 1; sobre esa fila se imprimirán todos los datos del nivel
+columnaNombreJugador EQU 1 ; ubicación del nombre del jugador actrual en el juego
+columnaTituloNivel EQU 10; ubicación del titulo
+columnaValorNivel EQU 16 ; ubicación del valor del nivel
+columnaRelojTiempo EQU 25 ;ubicación del reloj que indica el tiempo en el juego
   
 ;=== COLORES EQUIVALENTES === 
 colorBlancoGrafico EQU 0fh
@@ -128,7 +135,9 @@ lectorEntradaPass db 20 dup(finCadena);
 lectorEntradaTop db 20 dup(finCadena)
 lectorEntradaOrden db 20 dup(finCadena)
 lectorEntradaOrdenamiento db 20 dup(finCadena);
-lectorEntradaVelocidad db 20 dup(finCadena)   
+lectorEntradaVelocidad db 20 dup(finCadena) 
+visorNivel db 2 dup(finCadena) 
+visorReloj db 0,saltoLn,0,0, finCadena   
   
 ;Rutas ejecutando desde DosBox:
 nombreArchivoJugadores db 'B\Gamers.txt',finRutaFichero ;En emu8086 es 'C:\B\Gamers.txt',finRutaFichero
@@ -148,7 +157,7 @@ datosCurso db saltoLn,retornoCR, 'Universidad de San Carlos de Guatemala', salto
 misDatos db saltoLn,retornoCR,tabulador,'Byron Gerardo Castillo G',OtildadaMinus,'mez',saltoLn,retornoCR,tabulador,tabulador,'20170544',finCadena
 
 ;===   ALERTAS   ===  
-debug db saltoLn,retornoCR,'Punto Debug...',saltoLn,retornoCR,finCadena  
+debug db 'Punto Debug',saltoLn,retornoCR,finCadena   
 bienvenidaAdmin db saltoLn,retornoCR,'@: BIENVENIDO ',finCadena
 inicioJuego db saltoLn,retornoCR,'Iniciando Partida...',saltoLn,retornoCR,finCadena 
 finJuego db saltoLn,retornoCR,'fin de Partida...',saltoLn,retornoCR,finCadena       
@@ -167,6 +176,13 @@ aperturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de ab
 lecturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de leer el fichero',saltoLn,retornoCR,finCadena 
 tituloTopPuntajes db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 PUNTAJES !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
 tituloTopTiempos db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 TIEMPOS !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
+
+;======== ALERTAS/TITULOS EN MODO VIDEO =======
+debugVideo  db 'Debug',finCadena
+tituloNivel  db 'Nivel:',finCadena
+tituloBurbuja  db '#Bubble',finCadena
+tituloQuick  db '#Quick',finCadena
+tituloShell  db '#Shell:',finCadena
 
 ;=== SOLICITUDES ===    
 solicitudUsuario db saltoLn,retornoCR,'Ingrese el usuario:',saltoLn,retornoCR,finCadena   
@@ -239,7 +255,7 @@ BarraOrdenDinamica ElementoGrafico <20, 40, posicionBaseBarraGrafica, 15, colorC
 
 plataformaMovible ElementoGrafico <50, alturaBloque, posFilaInicialPlataforma, posColumnaInicialPlataforma, colorBlancoGrafico, direccionSuresteActiva>
 
-pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicialPelota, colorPielGrafico, direccionNoroesteActiva>
+pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicialPelota, colorPielGrafico, direccionNoroesteActiva>
 
 ;pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, 50, colorPielGrafico, direccionNoroesteActiva>
 
@@ -261,6 +277,9 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         
         ;call solicitarTeclaEspacio
         ;call establecerModoTexto
+
+    ;========================= MAIN ==============================================
+
 	main proc 
 	    IniciarPrograma:
 		    mostrarEncabezado
@@ -313,6 +332,8 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
 
     ;==================    PROCEDIMIENTOS:    ============================
 
+    ;========== ASIGNACIÓN DE DIRECCIONES ========================
+
     establecerSegmentoDatos proc
         PUSH DX
         asignarDIreccionDatos:
@@ -358,11 +379,15 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         ret 
     establecerValoresInicialesPartida endp
 
+
+
+    ;================= PUNTADO DE ELEMENTOS DEL JUEGO ==============
+
     dibujarMarcoGrafico proc
         dibujarContornosVerticales
         dibujarContornosHorizontales
         ret
-    dibujarMarcoGrafico endp
+    dibujarMarcoGrafico endp 
 
         
     pintarPrimerNivel proc
@@ -370,7 +395,8 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         call dibujarPlataforma
         call dibujarPelotaEstandar
         dibujarCaparazon
-        call solicitarTeclaEspacio
+        call imprimirDatosDeNivel
+        ;call solicitarTeclaEspacio
         chequearCambios 
         cmp  DS:[Configurador.estadoJuego],indicadorPartidaGanada
         je subirNivel
@@ -384,6 +410,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
     pintarPrimerNivel endp
 
     pintarSegundoNivel proc
+        call establecerDireccionVideo
         call dibujarMarcoGrafico
         call dibujarPlataforma
         call dibujarPelotaEstandar
@@ -415,6 +442,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         MOV bx, plataformaMovible.columnaActual
         call establecerDireccionVideo
         dibujarBloque
+        call establecerSegmentoDatos
         ret
     dibujarPlataforma endp
 
@@ -425,27 +453,30 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         MOV bx, plataformaMovible.columnaActual
         call establecerDireccionVideo
         borrarBloque
+        call establecerSegmentoDatos
         ret
     borrarPlataformaActual endp
 
     dibujarPelotaEstandar proc
         call establecerSegmentoDatos
-        MOV di, pelota.pixelesAncho ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV di, pelota.pixelesAncho ; 
         MOV dl, pelota.colorActual
         MOV ax, pelota.filaActual  
         MOV bx, pelota.columnaActual
         call establecerDireccionVideo
-        dibujarBloque
+        dibujarPelota
+        call establecerSegmentoDatos
         ret
     dibujarPelotaEstandar endp
 
     borrarPelotaActual proc
         call establecerSegmentoDatos
-        MOV di, pelota.pixelesAncho ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
+        MOV di, pelota.pixelesAncho ; 
         MOV ax, pelota.filaActual  
         MOV bx, pelota.columnaActual
         call establecerDireccionVideo
         borrarBloque
+        call establecerSegmentoDatos
         ret
     borrarPelotaActual endp
 
@@ -454,6 +485,8 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
     ;    probarBarra
     ;    ret
     ;barraDib endp
+
+    ;========================== SOLICITUDES DE TECLADO ================;
 
     solicitarTeclaEspacio proc
         PUSH AX
@@ -478,6 +511,8 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         ret
     limpiarBufferEntradaTeclado endp
 
+    ;====================== MOVIMIENTOS ===========================
+
     moverLadoIzquierdoPlataforma proc
         PUSH CX
         moverIzquierda:
@@ -486,6 +521,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             dec  plataformaMovible.columnaActual
             call establecerDireccionVideo
             call dibujarPlataforma
+            call establecerSegmentoDatos
         fin:    
             POP CX    
             ret
@@ -499,6 +535,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             inc  plataformaMovible.columnaActual
             call establecerDireccionVideo
             call dibujarPlataforma
+            call establecerSegmentoDatos
         fin: 
             POP CX   
             ret
@@ -539,6 +576,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
         PUSH BX
         PUSH CX
         PUSH DX
+        PUSH DI
         call establecerDireccionVideo
         desplazarmeIzquierda:
             dec cx
@@ -566,11 +604,13 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             MOV di, anchoBloque ; las lineas horizontales de la plataforma tendran 40 pixeles de longitud
             MOV ax, dx  
             MOV bx, cx
-            MOV dl, colorNegroGrafico
-            ;borrarBloque
-            dibujarBloque
+            ;MOV dl, colorNegroGrafico
+            borrarBloque
+            ;dibujarBloque
             call establecerSegmentoDatos
             MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+            ;call alternarRebote
+            POP DI
             POP DX
             POP CX
             POP BX
@@ -585,6 +625,7 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             cmp pelota.columnaActual, dx
             je destruccionFinalizada
             MOV dx, posMargenMaximoVertical
+            add dx, pelota.pixelesAncho
             dec dx; si estuviera uno antes/a la par del margen maximo vertical se restringe
             cmp pelota.columnaActual, dx
             je destruccionFinalizada
@@ -593,21 +634,376 @@ pelota ElementoGrafico <5, alturaBloque, posFilaInicialPelota, posColumnaInicial
             cmp pelota.filaActual, dx
             je destruccionFinalizada
             MOV dx, posMargenMaximoHorizontal
-            dec dx; si estuviera uno antes/por endima  del margen maximo vertical se restringe
+            SUB dx, pelota.pixelesAlto ; la altura ocuoa espacio antes de que llegue exactamente a esa fila
+            dec dx; si estuviera uno antes/por endima  del margen maximo horizontal se restringe
             cmp pelota.filaActual, dx
-            je destruccionFinalizada
+            je verificarFinalizacionJuego
+        verificarDestruccionPorEsquinas:
+           ;call evaluarChoqueEsquinas
+           cmp DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+           je destruccionFinalizada
         verificarDestruccionVertical:
             evaluarRebotesVerticalesDestructivos
-            call establecerSegmentoDatos
-            cmp DS:[Configurador.controladorBloque], indicadorBloqueEliminado
-            je destruccionFinalizada
+            ;call establecerSegmentoDatos
+            cmp DS:[Configurador.controladorBloque], indicadorBloqueActivo
+            je verificarDestruccionHorizontal
+            call alternarReboteVertical
+            jmp destruccionFinalizada
+        verificarFinalizacionJuego:
+            ;call establecerSegmentoDatos
+            MOV DS:[Configurador.estadoJuego], indicadorJuegoInactivo
         verificarDestruccionHorizontal:
             evaluarRebotesHorizontalesDestructivos
+            ;call establecerSegmentoDatos
+            cmp DS:[Configurador.controladorBloque], indicadorBloqueActivo
+            je destruccionFinalizada
+            call alternarReboteHorizontal
         destruccionFinalizada:
-            call establecerSegmentoDatos
+            ;call establecerSegmentoDatos
             MOV DS:[Configurador.controladorBloque], indicadorBloqueActivo
             ret
     delimitarSecuenciaDestruccionBloques endp 
+
+    alternarReboteVertical proc
+        ;dependiendo donde este actualmente dirigida la pelota entonces se asigna su nueva
+        ;orientación consecuente al rebote
+        cmp pelota.estadoDireccion, direccionNoresteActiva
+        je orientarSureste
+        cmp pelota.estadoDireccion, direccionNoroesteActiva
+        je orientarSuroeste
+        cmp pelota.estadoDireccion, direccionSuresteActiva
+        je orientarNoreste
+        cmp pelota.estadoDireccion, direccionSuroesteActiva
+        je orientarNoroeste
+        orientarNoreste:
+             MOV pelota.estadoDireccion, direccionNoresteActiva
+             jmp finOrientacion
+        orientarNoroeste:
+             MOV pelota.estadoDireccion, direccionNoroesteActiva
+             jmp finOrientacion
+        orientarSureste:
+             MOV pelota.estadoDireccion, direccionSuresteActiva
+             jmp finOrientacion
+        orientarSuroeste:
+             MOV pelota.estadoDireccion, direccionSuroesteActiva
+             jmp finOrientacion
+        finOrientacion:
+            ret
+    alternarReboteVertical endp
+
+    alternarReboteHorizontal proc
+        ;dependiendo donde este actualmente dirigida la pelota entonces se asigna su nueva
+        ;orientación consecuente al rebote
+        cmp pelota.estadoDireccion, direccionNoresteActiva
+        je orientarNoroeste
+        cmp pelota.estadoDireccion, direccionNoroesteActiva
+        je orientarNoreste
+        cmp pelota.estadoDireccion, direccionSuresteActiva
+        je orientarSuroeste
+        cmp pelota.estadoDireccion, direccionSuroesteActiva
+        je orientarSureste
+        orientarNoreste:
+             MOV pelota.estadoDireccion, direccionNoresteActiva
+             jmp finOrientacion
+        orientarNoroeste:
+             MOV pelota.estadoDireccion, direccionNoroesteActiva
+             jmp finOrientacion
+        orientarSureste:
+             MOV pelota.estadoDireccion, direccionSuresteActiva
+             jmp finOrientacion
+        orientarSuroeste:
+             MOV pelota.estadoDireccion, direccionSuroesteActiva
+             jmp finOrientacion
+        finOrientacion:
+            ret
+    alternarReboteHorizontal endp
+
+    ;  NO---------NE
+    ;  |           |  
+    ;  SO---------SE
+
+    borrarBloqueDesdeEsquinaNoreste proc
+        call establecerDireccionVideo
+        SUB bx, anchoBloque ;se le resta el ancho, y daod que se pasa 1 posición
+        inc bx ; se suma uno para estar en el punto exacto
+        borrarBloque
+        call establecerSegmentoDatos
+        MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+        ret
+    borrarBloqueDesdeEsquinaNoreste endp
+
+    borrarBloqueDesdeEsquinaNoroeste proc
+        call establecerDireccionVideo
+        borrarBloque
+        call establecerSegmentoDatos
+        MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+        ret
+    borrarBloqueDesdeEsquinaNoroeste endp
+        
+    borrarBloqueDesdeEsquinaSureste proc
+        call establecerDireccionVideo
+        SUB bx, anchoBloque
+        inc bx;
+        SUB ax, alturaBloque
+        inc ax
+        borrarBloque
+        call establecerSegmentoDatos
+        MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+        ret
+    borrarBloqueDesdeEsquinaSureste endp
+
+    borrarBloqueDesdeEsquinaSuroeste proc
+        call establecerDireccionVideo
+        SUB ax, alturaBloque
+        inc ax
+        borrarBloque
+        call establecerSegmentoDatos
+        MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+        ret
+    borrarBloqueDesdeEsquinaSuroeste endp
+
+    evaluarChoqueEsquinas proc
+        call establecerSegmentoDatos
+        MOV cx, pelota.columnaActual
+        MOV dx, pelota.filaActual
+        cmp pelota.estadoDireccion, direccionNoresteActiva
+        je orientarSureste
+        cmp pelota.estadoDireccion, direccionNoroesteActiva
+        je orientarSuroeste
+        cmp pelota.estadoDireccion, direccionSuresteActiva
+        je orientarNoreste
+        cmp pelota.estadoDireccion, direccionSuroesteActiva
+        je orientarNoroeste
+        orientarNoreste:
+            dec cx; pixel arriba de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            inc dx ;pixel de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            je finOrientacion
+            inc cx; pixel al costado derecho de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            dec cx ;regresamos a la esquina
+            MOV ax, dx
+            MOV bx, cx
+            call borrarBloqueDesdeEsquinaNoreste
+            ;call alternarRebote
+            jmp finOrientacion
+        orientarNoroeste:
+            inc cx ;pixel arriba de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            inc dx ;pixel de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            je finOrientacion
+            dec cx; pixel al costado izquierdo de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            inc cx ;regresamos al pixel de la esquina
+            MOV ax, dx
+            MOV bx, cx
+            call borrarBloqueDesdeEsquinaNoroeste
+            ;call alternarRebote
+            jmp finOrientacion
+        orientarSureste:
+            dec cx ;pixel debajo de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            dec dx ;pixel de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            je finOrientacion
+            inc cx; pixel al costado derecho de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            dec cx ;regresamos al pixel de la esquina
+            MOV ax, dx
+            MOV bx, cx
+            call borrarBloqueDesdeEsquinaSureste
+            ;call alternarRebote
+            jmp finOrientacion
+        orientarSuroeste:
+            inc cx ;pixel abajo de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            dec dx ;pixel de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            je finOrientacion
+            dec cx; pixel al costado izquierdo de la esquina
+            call establecerDireccionVideo
+            call obtenerColorPixel
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            jne finOrientacion
+            inc cx ;regresamos al pixel de la esquina
+            MOV ax, dx
+            MOV bx, cx
+            call borrarBloqueDesdeEsquinaSuroeste
+            ;call alternarRebote
+            jmp finOrientacion
+        finOrientacion:
+            ret
+    evaluarChoqueEsquinas endp
+
+    ;======================== IMPRESIÓN DE TITULOS/CONTEIDO EN MODO VIDEO ======================
+
+    imprimirDatosDeNivel proc
+        ;call imprimirJugador
+        call imprimirTituloNivel
+        ;call imprimirNivelActual
+        ;call imprimirRelojDeTiempo
+        ret
+    imprimirDatosDeNivel endp
+    
+    imprimirTituloNivel proc
+        ;call establecerSegmentoDatos
+        ;MOV DH, filaEstandarImpresionVideo ;fila del cursor
+        ;MOV DL, columnaTituloNivel ;columna del cursor
+        ;call establecerDireccionVideo
+        ;moverCursor
+        ;call establecerSegmentoDatos
+        ;imprimirEnConsola tituloNivel
+        ;ret
+
+        call establecerSegmentoDatos
+        MOV DH, filaEstandarImpresionVideo ;fila del cursor
+        MOV DL, columnaTituloNivel ;columna del cursor
+        MOV cx,offset tituloNivel ;proporcionamos la dirección de desplazamiento
+        call establecerDireccionVideo
+        moverCursor
+        call establecerSegmentoDatos
+        MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
+        MOV dx,cx ;proporcionamos la dirección de desplazamiento
+        int funcionesDOS
+        ret
+    imprimirTituloNivel endp
+
+    imprimirNivelActual proc ;referente al vaor numperico del nivel actual
+        MOV DH, filaEstandarImpresionVideo ;fila del cursor
+        MOV DL, columnaValorNivel ;columna del cursor
+        call establecerDireccionVideo
+        moverCursor
+        call establecerSegmentoDatos
+        MOV dl,  DS:[Configurador.nivelActual[0]]; esto es dado que solo queremos el primer elemento y los niveles no son mayores 10
+        ADD dl, diferenciaASCII;tenemos el número de nivel, pero necesitmaos el ascii, por eso le sumamos 30h (48D) para que coincida
+        MOV visorNivel[0], dl
+        imprimirEnConsola visorNivel[0]
+        ret
+    imprimirNivelActual endp
+
+    imprimirJugador proc
+        MOV DH, filaEstandarImpresionVideo ;fila del cursor
+        MOV DL, columnaNombreJugador ;columna del cursor
+        call establecerDireccionVideo
+        moverCursor
+        call establecerSegmentoDatos
+        imprimirEnConsola lectorEntradaUsuario
+        ret
+    imprimirJugador endp   
+
+    imprimirRelojDeTiempo proc
+        PUSH DX
+        PUSH AX
+        PUSH DI
+        ;este proceso estará bastante activo en el juego, por eso se emplea la pila para evitar alterar otras subrutinas
+        ;los demas no lo tiene dado que solo se usan al generar el nivel
+        MOV DH, filaEstandarImpresionVideo ;fila del cursor
+        MOV DL, columnaRelojTiempo ;columna del cursor
+        call establecerDireccionVideo
+        moverCursor
+        call establecerSegmentoDatos
+        MOV DI, 0
+        asignarDiferenciaASCII:
+            MOV Al, visorReloj[DI]
+            ADD Al, diferenciaASCII
+            MOV visorReloj[DI], Al
+            inc DI
+            cmp visorReloj[DI], finCadena
+            je impirmirReloj
+            jmp asignarDiferenciaASCII
+        impirmirReloj: 
+            imprimirEnConsola visorReloj
+            POP DI
+            POP AX
+            POP DX
+            ret
+    imprimirRelojDeTiempo endp
+
+    imprimirPrueba proc
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        MOV DH, 1 ;fila del cursor
+        MOV DL, 1 ;columna del cursor
+        call establecerDireccionVideo
+        moverCursor
+        call establecerSegmentoDatos
+        imprimirEnConsola tituloBurbuja
+        ;MOV DH, 1 ;fila del cursor
+        ;MOV DL, 10 ;columna del cursor
+        ;call establecerDireccionVideo
+        ;moverCursor
+        ;call establecerSegmentoDatos
+        ;imprimirEnConsola tituloNivel
+
+        ;MOV DH, 1 ;fila del cursor
+        ;MOV DL, 16 ;columna del cursor
+        ;call establecerDireccionVideo
+        ;moverCursor
+        ;call establecerSegmentoDatos
+        ;imprimirEnConsola debugVideo
+
+        ;MOV DH, 1 ;fila del cursor
+        ;MOV DL, 25 ;columna del cursor
+        ;call establecerDireccionVideo
+        ;moverCursor
+        ;call establecerSegmentoDatos
+        ;imprimirEnConsola debugVideo
+
+        ;call establecerDireccionVideo
+        POP DX
+        POP CX
+        POP BX
+        POP AX
+        ret 
+    imprimirPrueba endp
+
+
+    ;================= SUBRUTINAS DEL JUEGO ===============================
 
     retenerPausaEvaluada proc
         PUSH AX

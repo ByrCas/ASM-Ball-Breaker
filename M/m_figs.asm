@@ -52,6 +52,13 @@ limpiarEscenario macro
         POP CX
 endm
 
+moverCursor macro 
+    ;Rquiere en DH la fila y en DL la columna
+    MOV AH,02H
+    MOV BH, 00H
+    int funcionesDespligueVideo
+endm
+
 dibujarLineaVertical macro
     ;En base a las posciones que se delimiten en los registros se dibuja el elemento
     LOCAL dibujar, final

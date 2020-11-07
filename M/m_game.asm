@@ -34,36 +34,36 @@
 
 chequearCambios macro
     LOCAL chequear,evaluarTecla, desplazar, destruccion, establecer, fin
-    call establecerSegmentoDatos
     PUSH BX
     chequear:
+        call establecerSegmentoDatos
         MOV AH,subFuncionTiempoSistema ;obtenemos el tiempo del sistema
         INT funcionesDOS;CH = hour CL = minute DH = second DL = 1/100 seconds  
         CMP Dl,DS:[Configurador.tiempoActual]  ;Si el milisegundo ecaluado es igual o no al anteriro
         JE chequear    ;Si es igual vuelve a evaluar, si no entonces realiza todo lo demás
         MOV DS:[Configurador.tiempoActual],Dl ;update time
         PUSH CX; se guarda CX por algun otro proceso que lo este empleando durante el juego
-        destruccion:
-            call delimitarSecuenciaDestruccionBloques
-            MOV cl, DS:[Configurador.nivelActual]
-            MOV ch, DS:[Configurador.nivelActual]
-            ;Se les asigna el indicador de nivel ya que mediante su valor se harán N iteraciones,
-            ;esto permite que solo se cambie su valor con el paso de nivel y automáticamente
-            ;se desplazarán mas veces, viendose asi mas veloz en pantalla
-        evaluarTecla:
+        MOV cl, DS:[Configurador.nivelActual]
+        MOV ch, DS:[Configurador.nivelActual]
+        ;Se les asigna el indicador de nivel ya que mediante su valor se harán N iteraciones,
+        ;esto permite que solo se cambie su valor con el paso de nivel y automáticamente
+        ;se desplazarán mas veces, viendose asi mas veloz en pantalla
+        evaluarTecla: ;solo se emplea segmento de datos estándar
             dec ch
             evaluarAccionesDeTeclas; incluye pausa y movimientos de plataforma
-            evaluarAccionesDeTeclas;se evalua dos veces para un mayor movimiento y aumentar velocidad
+            ;evaluarAccionesDeTeclas;se evalua dos veces para un mayor movimiento y aumentar velocidad
             cmp ch, 0 
             je desplazar
             jmp evaluarTecla 
-        desplazar:
+        desplazar: ; se emplea segmento de datos estándar
             dec cl
             desplazarPelota
             desplazarPelota;se evalua dos veces para un mayor movimiento y aumentar velocidad
             cmp cl, 0 
-            je establecer
+            je destruccion
             jmp desplazar 
+        destruccion:
+            ;call delimitarSecuenciaDestruccionBloques
         establecer:    
             call establecerSegmentoDatos
             ; se establece ese segmento para las siguiedntes acciones
@@ -80,7 +80,7 @@ endm
 desplazarPelota macro 
     LOCAL desplazarNoreste, desplazarNoroeste, desplazarSureste, desplazarSuroeste, fin
     PUSH AX; se usara el registro al, pero se usa la pila para no alterar su valor de uso en otras macros 
-    call borrarPelotaActual ;esto borraráel biujo actual de la peloya (asi no dejará rastro)
+    call borrarPelotaActual ;esto borrar el dibujo actual de la pelota (asi no dejará rastro)
     call establecerSegmentoDatos;necesitamos esa ubicación para el uso de las variables
     cmp pelota.estadoDireccion, direccionNoresteActiva
     je desplazarNoreste
@@ -145,6 +145,7 @@ desplazarPelota macro
     fin:
         call establecerDireccionVideo
         call dibujarPelotaEstandar
+        call establecerSegmentoDatos
         POP AX ;obtenemos su valor original
 endm
 
@@ -197,8 +198,9 @@ evaluarRebotesVerticalesDestructivos macro
     PUSH BX
     PUSH CX
     PUSH DX
-    call establecerSegmentoDatos
+    call establecerSegmentoDatos ;necesitamos obtener valores del DS, no del modo video
     evaluacionVertical:
+        ;Dependiendo la dirección se evaluará su colisión, solo para rebotes verticales
         cmp pelota.estadoDireccion, direccionNoresteActiva
         je evaluarLadoSuperior
         cmp pelota.estadoDireccion, direccionNoroesteActiva
@@ -209,39 +211,58 @@ evaluarRebotesVerticalesDestructivos macro
         je evaluarLadoinferior
     evaluarLadoSuperior:
         MOV bx, pelota.filaActual
-        dec bx
-        MOV dx, bx 
+        dec bx 
+        ;si nos posicionamos en la (fila actual - 1), entonces estamos posicionados
+        ;en la parte baja de un posible bloque que este por encima de la pelota  
+        MOV dx, bx ;dx debe tener la fila obtenida
         jmp asignarColumna
     evaluarLadoinferior:
-        MOV bx, pelota.filaActual
+        MOV bx, pelota.filaActual 
         ADD bx, pelota.pixelesAlto
-        MOV dx, bx
+        ;Si nos posicionamos en la (fila actual + pixeles Alto) estamos poosicionados en 
+        ;la parte superior de un psobile bloque por debajo de la pelota, se consideran los
+        ;pixeles de alto ya que es el espacio del punto de dibujo de la 
+        ;pelota + el espacio que ocupa verticalmente
+        MOV dx, bx;dx debe tener el valor de la fila
     asignarColumna:
         MOV cx, pelota.columnaActual
+        ;se asigna la columna actual, mas adelante se evaluará a lo largo de su ancho
     retenerColumnaMaxima:
+        ;se necesita saber hasta que columna como máximo actualmente puede eabarcar la pelota
+        ;ya que si cualquiera de los puntos a lo largo del ancho de la pelota toca el bloque
+        ;entonces debe destruirse
         MOV ax, pelota.columnaActual
-        ADD ax, pelota.pixelesAncho
-        PUSH AX 
+        ADD ax, pelota.pixelesAncho 
+        PUSH AX ;lo guardamos en la pila de momento
     evaluarColor:
+        ;obtenemos el color del pixel en la coordenada obtenida previamente,
+        ;dbemos tener la direccion de video activa para el proceso  
         call establecerDireccionVideo
         call obtenerColorPixel
         ;call obtenerColorPorMatrizControl
         call establecerSegmentoDatos
-        cmp al, colorNegroGrafico
+        cmp al, colorNegroGrafico;si el color no equivale al color de fondo entonces es un bloque
         je reevaluacion 
         jmp destruccion
     destruccion:
         call destruirBloqueDesdeOrigen
         jmp fin
     reevaluacion:
-        inc cx
+        ;se manda a reevaluar ya que la coordenada actual no es parte de un bloque, pero
+        ;debemos evaluar las demas a lo largo del ancho de la pelota; este caso no aplica
+        ;para cuando una pelota topa esquina con esquina al bloaque, por eso estas se evaluan
+        ;previo a las destrucciones verticales u horizomntales
+        inc cx ;sea aumenta para evaluar la siguient ecolumna
         POP AX
         PUSH AX
         cmp cx, ax
+        ;obtenemos el valor de las columnas maximas que guardamos en la pila, lo volvemos a guardar 
+        ;para futuras evaluaciones, y comparamos, si llegamos a ese punto significa que en todo
+        ;el ancho de la pelota no topo con un bloque 
         je fin
         jmp evaluarColor
     fin:
-        POP CX
+        POP CX; se realiza este pop dado que aun sigue guardada en ppila el número de columnas máximas
         POP DX
         POP CX
         POP BX
@@ -256,6 +277,7 @@ evaluarRebotesHorizontalesDestructivos macro
     PUSH DX
     call establecerSegmentoDatos
     evaluacionHorizontal: 
+        ;Dependiendo la dirección se evaluará su colisión, solo para rebotes horizotales
         call establecerSegmentoDatos
         cmp pelota.estadoDireccion, direccionNoresteActiva
         je evaluarLadoDerecho
@@ -268,12 +290,16 @@ evaluarRebotesHorizontalesDestructivos macro
     evaluarLadoIzquierdo:
         MOV bx, pelota.columnaActual
         dec bx
-        MOV cx, bx 
+        MOV cx, bx ;cx debe tener ese valor
+        ;si nos posicionamos en la (columna actual - 1), entonces estamos posicionados
+        ;a la par de un posible bloque al costado izquierdo de la pelota  
         jmp asignarFila
     evaluarLadoDerecho:
         MOV bx, pelota.columnaActual
         ADD bx, pelota.pixelesAncho
-        MOV cx, bx
+        ;si nos posicionamos en la (columna actual - 1), entonces estamos posicionados
+        ;a la par de un posible bloque al costado izquierdo de la pelota  
+        MOV cx, bx; cx debe tener ese valor
     asignarFila:
         MOV dx, pelota.filaActual
     retenerFilaMaxima:
@@ -292,6 +318,8 @@ evaluarRebotesHorizontalesDestructivos macro
         call destruirBloqueDesdeOrigen
         jmp fin
     reevaluacion:
+        ;el analisis es similar a las verticales, pero en base a las filas de alto
+        ;de la poelota en vez de las columnas de ancho
         inc dx
         POP AX
         PUSH AX
