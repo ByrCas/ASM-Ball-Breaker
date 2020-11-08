@@ -139,7 +139,7 @@ lectorEntradaOrden db 20 dup(finCadena)
 lectorEntradaOrdenamiento db 20 dup(finCadena);
 lectorEntradaVelocidad db 20 dup(finCadena) 
 visorNivel db 2 dup(finCadena) 
-
+tiempoEstable db 0,0,0,finCadena; el tiempo que se registra en los ficheros
 ;Dado que son para el modo video, necesitamos reflejar "0:00" y "000pts", pero ya que necesitamos usar valores 
 ;numéricos dado que cambiarán con el tiempo, entonces se agrega con la diferencia ascii (30h) pero para que los
 ;caracteres cuadren se busco el simbolo que se necesitaba y se le resto 48 en cuanto a ascii, es por eso el uso de 
@@ -234,7 +234,9 @@ Configurador STRUC
    jugadorActual db ?
    nivelActual db ?
    puntajeActual db ?
-   tiempoActual db ?
+   tiempoBase db ? ;es el tiempo en segundos que realmente se tomará en cuenta como información a guardar
+   tiempoActualMilis db ?; sirve para evaluar cosas cada milisegundo
+   tiempoActualSegs db ?; sirve para evaluar cosas cada segundo
    estadoJuego db ?; 00h juego inactivo, 01h juego activo
    estadoPartida db ?; 00h partiuda perdida, 01h partida ganada
    controladorDeColores db 64000 dup(colorNegroGrafico);
@@ -380,7 +382,8 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     establecerModoTexto endp
 
     establecerValoresInicialesPartida proc
-        MOV DS:[Configurador.tiempoActual],0
+        MOV DS:[Configurador.tiempoActualMilis],0
+        MOV DS:[Configurador.tiempoActualSegs],0
         MOV DS:[Configurador.nivelActual],1
         MOV DS:[Configurador.estadoJuego], indicadorJuegoActivo
         MOV DS:[Configurador.estadoPartida], indicadorPartidaPerdida
@@ -641,6 +644,8 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             call establecerSegmentoDatos
             cmp al, colorNegroGrafico
             je restablecerFilaUtil
+            cmp al, pelota.colorActual
+            je restablecerFilaUtil
             jmp elevarFila
         restablecerFilaUtil:
             inc dx 
@@ -653,8 +658,9 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             borrarBloque
             ;dibujarBloque
             call establecerSegmentoDatos
+            call incrementarPuntos
             MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
-            ;call alternarRebote
+            ;call alternarRebote   
             POP DI
             POP DX
             POP CX
@@ -670,7 +676,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             cmp pelota.columnaActual, dx
             je destruccionFinalizada
             MOV dx, posMargenMaximoVertical
-            add dx, pelota.pixelesAncho
+            sub dx, pelota.pixelesAncho
             dec dx; si estuviera uno antes/a la par del margen maximo vertical se restringe
             cmp pelota.columnaActual, dx
             je destruccionFinalizada
@@ -683,6 +689,15 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             dec dx; si estuviera uno antes/por endima  del margen maximo horizontal se restringe
             cmp pelota.filaActual, dx
             je verificarFinalizacionJuego
+            MOV dx, posFilaInicialPlataforma
+            SUB dx, pelota.pixelesAlto ; la altura ocuoa espacio antes de que llegue exactamente a esa fila
+            dec dx; si estuviera uno antes/por endima  de la palataforma se debe rebotar pero no destruir
+            cmp pelota.filaActual, dx
+            je rebotarSinDestruccion
+            jmp verificarDestruccionPorEsquinas
+        rebotarSinDestruccion:
+           call alternarReboteVertical
+           jmp destruccionFinalizada
         verificarDestruccionPorEsquinas:
            ;call evaluarChoqueEsquinas
            cmp DS:[Configurador.controladorBloque], indicadorBloqueEliminado
@@ -1051,6 +1066,102 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     imprimirTituloOrdenamiento endp  
 
     ;================= SUBRUTINAS DEL JUEGO ===============================
+
+    plasmarCronometro proc 
+    ;visorReloj db 0,saltoLn,0,0, finCadena ;0:00
+    ;0-> minutos
+    ;2->decenas de segundo
+    ;3->unidades de segundo
+        ;inc DS:[Configurador.tiempoBase]; 
+        call incrementarTiempo ;este siempre incrementa, ya que los segundos si nos interesan, los otros son solo visuales para el croníometro
+        analizarMinutos:
+            cmp visorReloj[2], 5 ;si las decenas de segundo no equivalen a 5 evalua los segundos
+            jl analizarSegundos
+            cmp visorReloj[3], 9 ;si las unidades de segundo no equivalen a 9 evalua los segundos
+            jl analizarSegundos
+            jmp aumentarMinuto
+        analizarSegundos:
+            cmp visorReloj[3], 9 
+            ;si la unidad de segundo es menor a 9 solo se aumenta, si no se
+            ;aumneta la decena y se establece en 0
+            jl aumentarUnidadesSegundo
+            jmp aumentarDecenasSegundo
+        aumentarUnidadesSegundo:
+            inc visorReloj[3] ;aumenta la unidad de segundo
+            jmp finDeCiclo
+        aumentarDecenasSegundo:
+            MOV visorReloj[3], 0 ;aumenta las decenas de segundo y establece en 0 las unidades
+            inc visorReloj[2]
+            jmp finDeCiclo
+        aumentarMinuto:
+            MOV visorReloj[2], 0 ;establece en 0 lo segundos
+            MOV visorReloj[3], 0 
+            inc visorReloj[0] ;incrementa el minuto
+        finDeCiclo:
+            call imprimirRelojDeTiempo
+            ret
+    plasmarCronometro endp
+
+    incrementarPuntos proc
+        ;inc DS:[Configurador.puntajeActual]
+        ;0->centenas
+        ;1->decenas
+        ;2->unidades
+        analizarCentenas:
+            cmp visorPuntos[2], 9 
+            jl analizarInferiores
+            cmp visorPuntos[1], 9 
+            jl analizarInferiores
+            jmp aumentarCentenas
+        analizarInferiores: ;decenas y centenas
+            cmp visorPuntos[2], 9 
+            jl aumentarUnidades
+            je aumentarDecenas
+        aumentarUnidades:
+            inc visorPuntos[2] 
+            jmp finDeSuma
+        aumentarDecenas:
+            MOV visorPuntos[2], 0 
+            inc visorPuntos[1]
+            jmp finDeSuma
+        aumentarCentenas:
+            MOV visorPuntos[2], 0 
+            MOV visorPuntos[1], 0 
+            inc visorPuntos[0]
+        finDeSuma:    
+            call imprimirPuntajeAcumulado
+            ret
+    incrementarPuntos endp
+
+    incrementarTiempo proc
+        ;inc DS:[Configurador.puntajeActual]
+        ;0->centenas
+        ;1->decenas
+        ;2->unidades
+        analizarCentenas:
+            cmp tiempoEstable[2], 9 
+            jl analizarInferiores
+            cmp tiempoEstable[1], 9 
+            jl analizarInferiores
+            jmp aumentarCentenas
+        analizarInferiores: ;decenas y centenas
+            cmp tiempoEstable[2], 9 
+            jl aumentarUnidades
+            je aumentarDecenas
+        aumentarUnidades:
+            inc tiempoEstable[2] 
+            jmp finDeSuma
+        aumentarDecenas:
+            MOV tiempoEstable[2], 0 
+            inc tiempoEstable[1]
+            jmp finDeSuma
+        aumentarCentenas:
+            MOV tiempoEstable[2], 0 
+            MOV tiempoEstable[1], 0 
+            inc tiempoEstable[0]
+        finDeSuma:    
+            ret
+    incrementarTiempo endp
 
     retenerPausaEvaluada proc
         PUSH AX

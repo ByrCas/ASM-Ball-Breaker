@@ -33,25 +33,31 @@
 ;			JMP CHECK_TIME ;after everything checks time again
 
 chequearCambios macro
-    LOCAL chequear,evaluarTecla, desplazar, destruccion, establecer, fin
+    LOCAL chequear,evaluarCronometro,ajustarNivel,evaluarTecla, desplazar, destruccion, establecer, fin
     PUSH BX
     chequear:
         call establecerSegmentoDatos
         MOV AH,subFuncionTiempoSistema ;obtenemos el tiempo del sistema
         INT funcionesDOS;CH = hour CL = minute DH = second DL = 1/100 seconds  
-        CMP Dl,DS:[Configurador.tiempoActual]  ;Si el milisegundo ecaluado es igual o no al anteriro
+        CMP Dl,DS:[Configurador.tiempoActualMilis]  ;Si el milisegundo ecaluado es igual o no al anteriro
         JE chequear    ;Si es igual vuelve a evaluar, si no entonces realiza todo lo demás
-        MOV DS:[Configurador.tiempoActual],Dl ;update time
-        PUSH CX; se guarda CX por algun otro proceso que lo este empleando durante el juego
-        MOV cl, DS:[Configurador.nivelActual]
-        MOV ch, DS:[Configurador.nivelActual]
-        ;Se les asigna el indicador de nivel ya que mediante su valor se harán N iteraciones,
-        ;esto permite que solo se cambie su valor con el paso de nivel y automáticamente
-        ;se desplazarán mas veces, viendose asi mas veloz en pantalla
+        MOV DS:[Configurador.tiempoActualMilis],Dl ;update time
+        evaluarCronometro:
+            CMP DH,DS:[Configurador.tiempoActualSegs]  ;Si el milisegundo ecaluado es igual o no al anteriro
+            JE ajustarNivel    ;Si es igual vuelve a evaluar, si no entonces realiza todo lo demás
+            call plasmarCronometro
+            MOV DS:[Configurador.tiempoActualSegs],DH ;update time
+        ajustarNivel:
+            PUSH CX; se guarda CX por algun otro proceso que lo este empleando durante el juego
+            MOV cl, DS:[Configurador.nivelActual]
+            MOV ch, DS:[Configurador.nivelActual]
+            ;Se les asigna el indicador de nivel ya que mediante su valor se harán N iteraciones,
+            ;esto permite que solo se cambie su valor con el paso de nivel y automáticamente
+            ;se desplazarán mas veces, viendose asi mas veloz en pantalla
         evaluarTecla: ;solo se emplea segmento de datos estándar
             dec ch
             evaluarAccionesDeTeclas; incluye pausa y movimientos de plataforma
-            ;evaluarAccionesDeTeclas;se evalua dos veces para un mayor movimiento y aumentar velocidad
+            evaluarAccionesDeTeclas;se evalua dos veces para un mayor movimiento y aumentar velocidad
             cmp ch, 0 
             je desplazar
             jmp evaluarTecla 
@@ -63,7 +69,7 @@ chequearCambios macro
             je destruccion
             jmp desplazar 
         destruccion:
-            ;call delimitarSecuenciaDestruccionBloques
+            call delimitarSecuenciaDestruccionBloques
         establecer:    
             call establecerSegmentoDatos
             ; se establece ese segmento para las siguiedntes acciones
@@ -150,8 +156,9 @@ desplazarPelota macro
 endm
 
 evaluarAccionesDeTeclas macro
-    LOCAL evaluarTeclaActiva,evaluarPausa, evaluarTopeIzquierdo, evaluarTopeDerecho, desplazarIzquierda, desplazarDerecha, fin
+    LOCAL repetirIzquierda, repetirDerecha, evaluarTeclaActiva,evaluarPausa, evaluarTopeIzquierdo, evaluarTopeDerecho, desplazarIzquierda, desplazarDerecha, fin
     PUSH AX
+    PUSH CX
     evaluarTeclaActiva:
         XOR ax, ax
         MOV ah, subFuncionEstadoTeclado; solo verifica si se ingreso una tecla
@@ -175,8 +182,15 @@ evaluarAccionesDeTeclas macro
         cmp ax, posMargenMinimoVertical
         je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve    
     desplazarIzquierda:
-        call moverLadoIzquierdoPlataforma
-        jmp fin
+        MOV cl, DS:[Configurador.nivelActual]
+        repetirIzquierda:
+            dec cl
+            call moverLadoIzquierdoPlataforma
+            call moverLadoIzquierdoPlataforma
+            call moverLadoIzquierdoPlataforma
+            cmp cl, 0
+            je fin
+            jmp repetirIzquierda
     evaluarTopeDerecho:
         MOV ax, plataformaMovible.columnaActual
         add ax, plataformaMovible.pixelesAncho
@@ -185,10 +199,18 @@ evaluarAccionesDeTeclas macro
         cmp ax, posMargenMaximoVertical
         je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve 
     desplazarDerecha:
-        call moverLadoDerechoPlataforma
-        jmp fin
+        MOV cl, DS:[Configurador.nivelActual]
+        repetirDerecha:
+            dec cl
+            call moverLadoDerechoPlataforma
+            call moverLadoDerechoPlataforma
+            call moverLadoDerechoPlataforma
+            cmp cl, 0
+            je fin
+            jmp repetirDerecha
     fin:
         call limpiarBufferEntradaTeclado
+        POP CX
         POP AX
 endm
 
