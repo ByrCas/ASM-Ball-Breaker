@@ -394,6 +394,14 @@ validarParametrosReporte macro
             MOV bl, 1  ;tiempos
     generarTop: 
         ;animación y ordenamiewnto
+        PUSH BX
+        PUSH AX
+        call pintarEscenario
+        ;accion de ordenamiento
+        call establecerModoTexto
+        ;reporte:
+        POP AX
+        POP BX
         accionarTopResultados bl, ah
         jmp seccionTops ;hay que validar una paequeña pausa
 endm

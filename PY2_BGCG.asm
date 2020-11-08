@@ -90,10 +90,12 @@ direccionSuroesteActiva EQU 03h; representación activa de Noreste
 
 ;Coordenadas de Titulos en Modo video:
 filaEstandarImpresionVideo EQU 1; sobre esa fila se imprimirán todos los datos del nivel
-columnaNombreJugador EQU 1 ; ubicación del nombre del jugador actrual en el juego
+columnaNombreJugador EQU 1 ; ubicación del nombre del jugador actual en el juego
 columnaTituloNivel EQU 10; ubicación del titulo
 columnaValorNivel EQU 16 ; ubicación del valor del nivel
-columnaRelojTiempo EQU 25 ;ubicación del reloj que indica el tiempo en el juego
+columnaPuntajeActual EQU 25;ubicación de los puntos actuales
+columnaRelojTiempo EQU 33 ;ubicación del reloj que indica el tiempo en el juego
+columnaNombreOrdenamiento EQU 1 ; ubicación del nombre del ordenamiento actual del gráfico
   
 ;=== COLORES EQUIVALENTES === 
 colorBlancoGrafico EQU 0fh
@@ -137,7 +139,13 @@ lectorEntradaOrden db 20 dup(finCadena)
 lectorEntradaOrdenamiento db 20 dup(finCadena);
 lectorEntradaVelocidad db 20 dup(finCadena) 
 visorNivel db 2 dup(finCadena) 
-visorReloj db 0,saltoLn,0,0, finCadena   
+
+;Dado que son para el modo video, necesitamos reflejar "0:00" y "000pts", pero ya que necesitamos usar valores 
+;numéricos dado que cambiarán con el tiempo, entonces se agrega con la diferencia ascii (30h) pero para que los
+;caracteres cuadren se busco el simbolo que se necesitaba y se le resto 48 en cuanto a ascii, es por eso el uso de 
+;saltoLn para ":", de @ para "p", de "D" para t y de "C" pata s 
+visorReloj db 0,saltoLn,0,0, finCadena ;0:00
+visorPuntos db 0,0,0,'@','D','C',finCadena  ;000pts 
   
 ;Rutas ejecutando desde DosBox:
 nombreArchivoJugadores db 'B\Gamers.txt',finRutaFichero ;En emu8086 es 'C:\B\Gamers.txt',finRutaFichero
@@ -204,7 +212,7 @@ menuTops db saltoLn,retornoCR,'!#!#!#!#!#!#! MENU TOPS !#!#!#!#!#!#!#!#!',saltoL
          db '(3)->Regresar.',saltoLn,retornoCR,saltoLn
          db 'Elija una opci',OtildadaMinus,'n:',saltoLn,retornoCR,finCadena
          
-menuOrdenamientos db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDENAMIENTOSL !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
+menuOrdenamientos db saltoLn,retornoCR,'!#!#!#!#!#!#! ORDENAMIENTOS !#!#!#!#!#!#!#!#!',saltoLn,retornoCR
                   db '(1)->Bubble Sort.',saltoLn,retornoCR
                   db '(2)->Quick Sort.',saltoLn,retornoCR
                   db '(3)->Shell Sort.',saltoLn,retornoCR,saltoLn
@@ -396,7 +404,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         call dibujarPelotaEstandar
         dibujarCaparazon
         call imprimirDatosDeNivel
-        ;call solicitarTeclaEspacio
+        call solicitarTeclaEspacio
         chequearCambios 
         cmp  DS:[Configurador.estadoJuego],indicadorPartidaGanada
         je subirNivel
@@ -433,6 +441,43 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             int 16h  
         ret
     pintarTercerNivel endp
+
+    pintarEscenario proc
+        call establecerModoVideo; aqui si es necesario para el grasfico de ordenamientos
+        call dibujarMarcoGrafico 
+        call imprimirRelojDeTiempo
+        cmp lectorEntradaOrdenamiento[0], '1'
+        je imprimirBurbuja
+        cmp lectorEntradaOrdenamiento[0], '2'
+        je imprimirQuick
+        cmp lectorEntradaOrdenamiento[0], '3'
+        je imprimirShell
+        imprimirBurbuja:
+            call establecerSegmentoDatos
+            MOV cx, offset tituloBurbuja
+            call imprimirTituloOrdenamiento
+            jmp pedirTecla
+        imprimirQuick:
+            call establecerSegmentoDatos
+            MOV cx, offset tituloQuick
+            call imprimirTituloOrdenamiento
+            jmp pedirTecla
+        imprimirShell:
+            call establecerSegmentoDatos
+            MOV cx, offset tituloShell
+            call imprimirTituloOrdenamiento
+            jmp pedirTecla
+        ;debemos dibujar las barras
+        ;imprimirBarras:
+        pedirTecla:
+            ; esperar por tecla
+            mov ah,10h
+            int 16h  
+        call establecerSegmentoDatos
+        ret
+    pintarEscenario endp
+
+
 
     dibujarPlataforma proc
         call establecerSegmentoDatos
@@ -881,23 +926,23 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     ;======================== IMPRESIÓN DE TITULOS/CONTEIDO EN MODO VIDEO ======================
 
     imprimirDatosDeNivel proc
-        ;call imprimirJugador
+        PUSH AX
+        PUSH BX
+        PUSH CX
+        PUSH DX
+        call imprimirJugador
         call imprimirTituloNivel
-        ;call imprimirNivelActual
-        ;call imprimirRelojDeTiempo
+        call imprimirNivelActual
+        call imprimirRelojDeTiempo
+        call imprimirPuntajeAcumulado
+        POP DX
+        POP CX
+        POP BX
+        POP AX
         ret
     imprimirDatosDeNivel endp
     
     imprimirTituloNivel proc
-        ;call establecerSegmentoDatos
-        ;MOV DH, filaEstandarImpresionVideo ;fila del cursor
-        ;MOV DL, columnaTituloNivel ;columna del cursor
-        ;call establecerDireccionVideo
-        ;moverCursor
-        ;call establecerSegmentoDatos
-        ;imprimirEnConsola tituloNivel
-        ;ret
-
         call establecerSegmentoDatos
         MOV DH, filaEstandarImpresionVideo ;fila del cursor
         MOV DL, columnaTituloNivel ;columna del cursor
@@ -912,25 +957,33 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     imprimirTituloNivel endp
 
     imprimirNivelActual proc ;referente al vaor numperico del nivel actual
+        call establecerSegmentoDatos
+        MOV dl,  DS:[Configurador.nivelActual[0]]; esto es dado que solo queremos el primer elemento y los niveles no son mayores 10
+        ADD dl, diferenciaASCII;tenemos el número de nivel, pero necesitmaos el ascii, por eso le sumamos 30h (48D) para que coincida
+        MOV visorNivel[0], dl
+        MOV cx,offset visorNivel[0] 
         MOV DH, filaEstandarImpresionVideo ;fila del cursor
         MOV DL, columnaValorNivel ;columna del cursor
         call establecerDireccionVideo
         moverCursor
         call establecerSegmentoDatos
-        MOV dl,  DS:[Configurador.nivelActual[0]]; esto es dado que solo queremos el primer elemento y los niveles no son mayores 10
-        ADD dl, diferenciaASCII;tenemos el número de nivel, pero necesitmaos el ascii, por eso le sumamos 30h (48D) para que coincida
-        MOV visorNivel[0], dl
-        imprimirEnConsola visorNivel[0]
+        MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
+        MOV dx,cx ;proporcionamos la dirección de desplazamiento
+        int funcionesDOS
         ret
     imprimirNivelActual endp
 
     imprimirJugador proc
+        call establecerSegmentoDatos
         MOV DH, filaEstandarImpresionVideo ;fila del cursor
         MOV DL, columnaNombreJugador ;columna del cursor
+        MOV cx, offset lectorEntradaUsuario
         call establecerDireccionVideo
         moverCursor
         call establecerSegmentoDatos
-        imprimirEnConsola lectorEntradaUsuario
+        MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
+        MOV dx,cx ;proporcionamos la dirección de desplazamiento
+        int funcionesDOS
         ret
     imprimirJugador endp   
 
@@ -940,88 +993,95 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         PUSH DI
         ;este proceso estará bastante activo en el juego, por eso se emplea la pila para evitar alterar otras subrutinas
         ;los demas no lo tiene dado que solo se usan al generar el nivel
+        call establecerSegmentoDatos
         MOV DH, filaEstandarImpresionVideo ;fila del cursor
         MOV DL, columnaRelojTiempo ;columna del cursor
+        MOV CX, offset visorReloj
         call establecerDireccionVideo
         moverCursor
         call establecerSegmentoDatos
-        MOV DI, 0
-        asignarDiferenciaASCII:
-            MOV Al, visorReloj[DI]
-            ADD Al, diferenciaASCII
-            MOV visorReloj[DI], Al
-            inc DI
-            cmp visorReloj[DI], finCadena
-            je impirmirReloj
-            jmp asignarDiferenciaASCII
-        impirmirReloj: 
-            imprimirEnConsola visorReloj
+        incrementarValorASCIICadena visorReloj; a la cadena se le aumenta la dif. ascii para que coincida el simbolo del digito
+        imprimirReloj: 
+            MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
+            MOV dx,cx ;proporcionamos la dirección de desplazamiento
+            int funcionesDOS
+            reducirValorASCIICadena visorReloj ;se reduce ya que no queremos que se incremente cada vez que se imprima
             POP DI
             POP AX
             POP DX
             ret
     imprimirRelojDeTiempo endp
 
-    imprimirPrueba proc
-        PUSH AX
-        PUSH BX
-        PUSH CX
+    imprimirPuntajeAcumulado proc
         PUSH DX
-        MOV DH, 1 ;fila del cursor
-        MOV DL, 1 ;columna del cursor
+        PUSH AX
+        PUSH DI
+        ;este proceso estará bastante activo en el juego, por eso se emplea la pila para evitar alterar otras subrutinas
+        ;los demas no lo tiene dado que solo se usan al generar el nivel
+        call establecerSegmentoDatos
+        MOV DH, filaEstandarImpresionVideo ;fila del cursor
+        MOV DL, columnaPuntajeActual ;columna del cursor
+        MOV CX, offset visorPuntos
         call establecerDireccionVideo
         moverCursor
         call establecerSegmentoDatos
-        imprimirEnConsola tituloBurbuja
-        ;MOV DH, 1 ;fila del cursor
-        ;MOV DL, 10 ;columna del cursor
-        ;call establecerDireccionVideo
-        ;moverCursor
-        ;call establecerSegmentoDatos
-        ;imprimirEnConsola tituloNivel
+        MOV DI, 0
+        incrementarValorASCIICadena visorPuntos
+        imprimirPuntos: 
+            MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
+            MOV dx,cx ;proporcionamos la dirección de desplazamiento
+            int funcionesDOS
+            reducirValorASCIICadena visorPuntos
+            POP DI
+            POP AX
+            POP DX
+            ret
+    imprimirPuntajeAcumulado endp
 
-        ;MOV DH, 1 ;fila del cursor
-        ;MOV DL, 16 ;columna del cursor
-        ;call establecerDireccionVideo
-        ;moverCursor
-        ;call establecerSegmentoDatos
-        ;imprimirEnConsola debugVideo
-
-        ;MOV DH, 1 ;fila del cursor
-        ;MOV DL, 25 ;columna del cursor
-        ;call establecerDireccionVideo
-        ;moverCursor
-        ;call establecerSegmentoDatos
-        ;imprimirEnConsola debugVideo
-
-        ;call establecerDireccionVideo
-        POP DX
-        POP CX
-        POP BX
-        POP AX
-        ret 
-    imprimirPrueba endp
-
+    imprimirTituloOrdenamiento proc
+        MOV DH, filaEstandarImpresionVideo ;fila del cursor
+        MOV DL, columnaNombreOrdenamiento ;columna del cursor
+        call establecerDireccionVideo
+        moverCursor
+        call establecerSegmentoDatos
+        MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
+        MOV dx,cx ;proporcionamos la dirección de desplazamiento
+        int funcionesDOS
+        ret
+    imprimirTituloOrdenamiento endp  
 
     ;================= SUBRUTINAS DEL JUEGO ===============================
 
     retenerPausaEvaluada proc
         PUSH AX
+        ;PUSH CX
         call limpiarBufferEntradaTeclado; se limpia el buffer para no volver a evaluar lo previo ingresado
+        ;xor cx, cx
         pedirOpcionTecla:
             ;esperar por tecla
-            mov ah,subFuncionSolicitudTeclado
+            ;inc cx
+            mov ah,subFuncionEstadoTeclado
             int funcionesTeclado
+            jz pedirOpcionTecla
             cmp al, espacio ;AL actualmente posee el ascii de la tecla ingresada
             je asignarRegreso
             cmp al, teclaMinusculaP ;AL actualmente posee el ascii de la tecla ingresada
             je reanudarJuego
+            ;cmp cx, 6000
+            call limpiarBufferEntradaTeclado
+            ;je  reanudarJuego
             jmp pedirOpcionTecla 
         asignarRegreso:; cambia el indicaodr para que se sepa que debe finalizar el juego    
+            call establecerSegmentoDatos
             MOV DS:[Configurador.estadoJuego], indicadorJuegoInactivo
         reanudarJuego:
+            ;POP CX
             POP AX
             ret ;retornará al punto donde fue llamdo (en la evaluación de teclas del jeugo, para proseguir con él)
     retenerPausaEvaluada endp
+
+    ;==============================================================================================
+
+
 
 end

@@ -25,3 +25,35 @@ mostrarMenuPrincipal macro
     imprimirEnConsola tituloJuego   
     imprimirEnConsola menuPrincipal
 endm  
+
+;=============ASCII==============
+
+incrementarValorASCIICadena macro vector
+    LOCAL asignarDiferenciaASCII, fin
+    MOV DI, 0
+    asignarDiferenciaASCII:
+        MOV Al, vector[DI]
+        ADD Al, diferenciaASCII
+        MOV vector[DI], Al
+        inc DI
+        cmp vector[DI], finCadena
+        je fin
+        jmp asignarDiferenciaASCII
+    fin:
+endm
+
+reducirValorASCIICadena macro vector
+    LOCAL desasignarDiferenciaASCII, fin
+    MOV DI, 0
+    desasignarDiferenciaASCII:
+        MOV Al, vector[DI]
+        SUB Al, diferenciaASCII
+        MOV vector[DI], Al
+        inc DI
+        cmp vector[DI], finCadena
+        je fin
+        jmp desasignarDiferenciaASCII
+    fin:
+endm
+
+
