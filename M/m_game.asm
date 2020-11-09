@@ -353,7 +353,7 @@ actualizarDatosPartida macro nivel, puntaje, tiempo
 endm
 
 adjuntarPartida macro
-    LOCAL incorporarUsuario, separarUsuario, incorporarNivel, incorporarTiempo, incorporarSeparador 
+    LOCAL incorporarUsuario, separarUsuario, separarPuntaje, incorporarNivel, incorporarTiempo, incorporarSeparador 
     PUSH SI
     PUSH DI
     xor si, si
@@ -362,7 +362,7 @@ adjuntarPartida macro
     MOV bl, 1 ;indicador de apertura y lectura del archivo 
     reiniciarEscritorFicheros
     accionarArchivoEnrutado dl, bl ;se abre el contenido de el archivo
-    MOV CX, 0
+    MOV CX, 0 ;permitira llevar la cuenta d ebytes/caracteres a escribur enn el fichero
     incorporarUsuario:
         MOV bl, lectorEntradaUsuario[di]
         MOV escritorFicheroActual[si],bl 
@@ -377,30 +377,44 @@ adjuntarPartida macro
         inc si
         inc cx  
     incorporarNivel:
-        MOV bl, DS:[Configurador.nivelActual] 
+        MOV bl, DS:[Configurador.nivelActual[0]]; esto dado que solo es un digito 
+        ADD BL, diferenciaASCII
         MOV escritorFicheroActual[si], bl
         inc si
         inc cx
         MOV escritorFicheroActual[si], coma;separador
         inc si   
         inc cx   
+        xor di, di
     incorporarPuntaje:
-        MOV bl, DS:[Configurador.puntajeActual]
-        MOV escritorFicheroActual[si],  bl
+        MOV bl, visorPuntos[di]
+        ADD BL, diferenciaASCII
+        MOV escritorFicheroActual[si],bl 
         inc si
+        inc di
         inc cx
-        MOV escritorFicheroActual[si], coma;separador
-        inc si   
+        cmp visorPuntos[di], 40h ; letra @, yaa que el vector tiene 000pts -> 000@
+        je separarPuntaje
+        jmp incorporarPuntaje
+    separarPuntaje:
+        MOV escritorFicheroActual[si], coma
+        inc si
         inc cx 
+        xor di,di
     incorporarTiempo:
-        MOV bl, DS:[Configurador.tiempoActual]
-        MOV escritorFicheroActual[si], bl 
+        MOV bl, tiempoEstable[di]
+        ADD BL, diferenciaASCII
+        MOV escritorFicheroActual[si],bl 
         inc si
+        inc di
         inc cx
-        MOV escritorFicheroActual[si], puntoComa;separador
-        inc si   
-        inc cx 
+        cmp tiempoEstable[di], finCadena ; letra "p", yaa que el vector tiene 000pts
+        je incorporarSeparador
+        jmp incorporarTiempo
     incorporarSeparador:
+        MOV escritorFicheroActual[si], puntoComa 
+        inc cx
+        inc si 
         MOV escritorFicheroActual[si], retornoCR 
         inc cx
         inc si  
@@ -419,10 +433,5 @@ endm
 
 
 finalizarJuego macro
-    ;validar separación de digitos de los puntos y tiempos
-    MOV dl, 31h
-    MOV bl, 32h
-    MOV al, 33h
-    actualizarDatosPartida dl, bl, al
     adjuntarPartida 
 endm

@@ -329,6 +329,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             call establecerModoVideo
             call pintarPrimerNivel
             call establecerModoTexto
+            finalizarJuego
 		    cmp DS:[Configurador.estadoPartida], indicadorPartidaGanada
             je  notificarJugadaExitosa
             jmp notificarGameOver   
@@ -460,7 +461,6 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             call cambiarNivel
             call pintarSegundoNivel
         regresarMenuPrincipal:
-            ;**agregar datos a archvios**
             ret ;si pierde alguno de los niveles regresa al menu principal
     pintarPrimerNivel endp
 
@@ -480,7 +480,6 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             call cambiarNivel
             call pintarTercerNivel
         regresarMenuPrincipal:
-            ;**agregar datos a archvios**
             ret ;si pierde alguno de los niveles regresa al menu principal
     pintarSegundoNivel endp
 
