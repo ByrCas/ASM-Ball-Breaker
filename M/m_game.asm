@@ -33,7 +33,7 @@
 ;			JMP CHECK_TIME ;after everything checks time again
 
 chequearCambios macro
-    LOCAL chequear,evaluarCronometro,ajustarNivel,evaluarTecla, desplazar, destruccion, establecer, fin
+    LOCAL chequear,ajustarRetardo, evaluarCronometro,ajustarNivel,evaluarTecla, desplazar, destruccion, establecer, fin
     PUSH BX
     chequear:
         call establecerSegmentoDatos
@@ -44,41 +44,33 @@ chequearCambios macro
         MOV DS:[Configurador.tiempoActualMilis],Dl ;update time
         evaluarCronometro:
             CMP DH,DS:[Configurador.tiempoActualSegs]  ;Si el milisegundo ecaluado es igual o no al anteriro
-            JE ajustarNivel    ;Si es igual vuelve a evaluar, si no entonces realiza todo lo demás
+            JE ajustarRetardo    ;Si es igual vuelve a evaluar, si no entonces realiza todo lo demás
             call plasmarCronometro
             MOV DS:[Configurador.tiempoActualSegs],DH ;update time
-        ajustarNivel:
-            PUSH CX; se guarda CX por algun otro proceso que lo este empleando durante el juego
-            MOV cl, DS:[Configurador.nivelActual]
-            MOV ch, DS:[Configurador.nivelActual]
-            ;Se les asigna el indicador de nivel ya que mediante su valor se harán N iteraciones,
-            ;esto permite que solo se cambie su valor con el paso de nivel y automáticamente
-            ;se desplazarán mas veces, viendose asi mas veloz en pantalla
+        ajustarRetardo:
+            MOV CL, DS:[Configurador.nivelActual] 
+            ;el nivel indicarpa el nupmero de veces que se ejecutará todo el proceso por milisefundo
+            ; mientras mas grande sea el nivel, mas iteraciones tendrá y serán mas veloces.
+            ;los movimientos
+            inc cl ;se incrementa uno para mayor velocidad
+        finalizarRepeticiones:
+           cmp cl, 0 ;hasta que se terminen las iteraciones vuelve a evaluar el cambio de milisegundo
+            je chequear
         evaluarTecla: ;solo se emplea segmento de datos estándar
-            dec ch
             evaluarAccionesDeTeclas; incluye pausa y movimientos de plataforma
-            evaluarAccionesDeTeclas;se evalua dos veces para un mayor movimiento y aumentar velocidad
-            cmp ch, 0 
-            je desplazar
-            jmp evaluarTecla 
         desplazar: ; se emplea segmento de datos estándar
-            dec cl
             desplazarPelota
-            desplazarPelota;se evalua dos veces para un mayor movimiento y aumentar velocidad
-            cmp cl, 0 
-            je destruccion
-            jmp desplazar 
         destruccion:
             call delimitarSecuenciaDestruccionBloques
         establecer:    
             call establecerSegmentoDatos
             ; se establece ese segmento para las siguiedntes acciones
             ;y por si se debe volver a chequear
-            POP CX; recuperamos su valor
+            dec cl
             MOV bl, indicadorJuegoInactivo 
             cmp bl, DS:[Configurador.estadoJuego]
             je fin
-            JMP chequear ;volvemos a evaluar
+            JMP finalizarRepeticiones
     fin:
         POP BX
 endm
@@ -177,33 +169,31 @@ evaluarAccionesDeTeclas macro
         jmp fin
     ;MOVIMIENTOS PLATAFORMA:    
     evaluarTopeIzquierdo:
-        MOV ax, plataformaMovible.columnaActual
-        dec ax;ax será la columna del margen minimo vertical si se encuentra la plataforma a la par;
-        cmp ax, posMargenMinimoVertical
-        je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve    
-    desplazarIzquierda:
         MOV cl, DS:[Configurador.nivelActual]
+        add cl, 4 ;sirve para que uere mas veces el movimiento y se aprecie mas veloz
         repetirIzquierda:
             dec cl
-            call moverLadoIzquierdoPlataforma
-            call moverLadoIzquierdoPlataforma
+            MOV ax, plataformaMovible.columnaActual
+            dec ax;ax será la columna del margen minimo vertical si se encuentra la plataforma a la par;
+            cmp ax, posMargenMinimoVertical
+            je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve    
+        desplazarIzquierda:
             call moverLadoIzquierdoPlataforma
             cmp cl, 0
             je fin
             jmp repetirIzquierda
     evaluarTopeDerecho:
-        MOV ax, plataformaMovible.columnaActual
-        add ax, plataformaMovible.pixelesAncho
-        ;ax será la columna del margen maximo vertical si se encuentra la plataforma a la par
-        ;ya que es el lado derecho se considerá el ancho de la plataforma
-        cmp ax, posMargenMaximoVertical
-        je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve 
-    desplazarDerecha:
         MOV cl, DS:[Configurador.nivelActual]
+        add cl, 4 ;sirve para que uere mas veces el movimiento y se aprecie mas veloz
         repetirDerecha:
             dec cl
-            call moverLadoDerechoPlataforma
-            call moverLadoDerechoPlataforma
+            MOV ax, plataformaMovible.columnaActual
+            add ax, plataformaMovible.pixelesAncho
+            ;ax será la columna del margen maximo vertical si se encuentra la plataforma a la par
+            ;ya que es el lado derecho se considerá el ancho de la plataforma
+            cmp ax, posMargenMaximoVertical
+            je fin; si equivale no hace nada(no podria pasar), si no entonces si se mueve 
+    desplazarDerecha:
             call moverLadoDerechoPlataforma
             cmp cl, 0
             je fin
@@ -259,9 +249,9 @@ evaluarRebotesVerticalesDestructivos macro
     evaluarColor:
         ;obtenemos el color del pixel en la coordenada obtenida previamente,
         ;dbemos tener la direccion de video activa para el proceso  
-        call establecerDireccionVideo
-        call obtenerColorPixel
-        ;call obtenerColorPorMatrizControl
+        ;call establecerDireccionVideo
+        ;call obtenerColorPixel
+        call obtenerColorPorMatrizControl
         call establecerSegmentoDatos
         cmp al, colorNegroGrafico;si el color no equivale al color de fondo entonces es un bloque
         je reevaluacion 
@@ -329,9 +319,9 @@ evaluarRebotesHorizontalesDestructivos macro
         ADD ax, pelota.pixelesAlto
         PUSH AX 
     evaluarColor:
-        call establecerDireccionVideo
-        call obtenerColorPixel
-        ;call obtenerColorPorMatrizControl
+        ;call establecerDireccionVideo
+        ;call obtenerColorPixel
+        call obtenerColorPorMatrizControl
         call establecerSegmentoDatos
         cmp al, colorNegroGrafico
         je reevaluacion 
@@ -371,7 +361,7 @@ adjuntarPartida macro
     MOV dl, 1 ;indica que se use la ruta del archivo de indice 1 (Rounds.txt)
     MOV bl, 1 ;indicador de apertura y lectura del archivo 
     reiniciarEscritorFicheros
-    accionarArchivoEnrutado dl, bl ;se abre el contenido de se archivo
+    accionarArchivoEnrutado dl, bl ;se abre el contenido de el archivo
     MOV CX, 0
     incorporarUsuario:
         MOV bl, lectorEntradaUsuario[di]

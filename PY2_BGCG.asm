@@ -185,6 +185,19 @@ lecturaArchivoErronea db saltoLn,retornoCR,'Se produjo un fallo al tratar de lee
 tituloTopPuntajes db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 PUNTAJES !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
 tituloTopTiempos db saltoLn,retornoCR,'!#!#!#!#!#!#!#! TOP 10 TIEMPOS !#!#!#!#!#!#!#!',saltoLn,retornoCR,finCadena
 
+;================= MENSAJES DE FIN DE JUEGO ====================
+gameOver db retornoCR,saltoLn,'---@@@@--@--@@@@@--@@@@--@@@@@-@--@--@@@@-@@@@'
+         db retornoCR,saltoLn,'---@----@-@-@-@-@--@-----@---@ @--@--@----@--@'
+         db retornoCR,saltoLn,'---@-@@-@@@-@-@-@--@@@@--@---@ @--@--@@@@-@@@@'
+         db retornoCR,saltoLn,'---@--@-@-@-@-@-@--@-----@---@ @--@--@----@--@'
+         db retornoCR,saltoLn,'---@@@@-@-@-@-@-@--@@@@--@@@@@--@@---@@@@-@--@',retornoCR,saltoLn,finCadena
+
+partidaExitosa  db retornoCR,saltoLn,'---@@@@--@--@@@--@--@@-@@@-@@@--@--@'
+                db retornoCR,saltoLn,'---@----@-@-@-@-@-@-@---@--@----@--@'
+                db retornoCR,saltoLn,'---@-@@-@@@-@-@-@@@-@@--@--@@@--@--@'
+                db retornoCR,saltoLn,'---@--@-@-@-@-@-@-@--@--@--@-------'
+                db retornoCR,saltoLn,'---@@@@-@-@-@-@-@-@-@@--@--@@@--*--*',retornoCR,saltoLn,finCadena
+
 ;======== ALERTAS/TITULOS EN MODO VIDEO =======
 debugVideo  db 'Debug',finCadena
 tituloNivel  db 'Nivel:',finCadena
@@ -233,8 +246,7 @@ Orientador ENDS
 Configurador STRUC
    jugadorActual db ?
    nivelActual db ?
-   puntajeActual db ?
-   tiempoBase db ? ;es el tiempo en segundos que realmente se tomará en cuenta como información a guardar
+   bloquesGenerados db ?
    tiempoActualMilis db ?; sirve para evaluar cosas cada milisegundo
    tiempoActualSegs db ?; sirve para evaluar cosas cada segundo
    estadoJuego db ?; 00h juego inactivo, 01h juego activo
@@ -317,7 +329,9 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             call establecerModoVideo
             call pintarPrimerNivel
             call establecerModoTexto
-		    jmp  menuInicial    
+		    cmp DS:[Configurador.estadoPartida], indicadorPartidaGanada
+            je  notificarJugadaExitosa
+            jmp notificarGameOver   
 		Salir: 
 			salirPrograma  
 	    distribuirSubMenuPrincipal:  
@@ -338,6 +352,12 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         errorAperturaArchivo: 
             imprimirEnConsola aperturaArchivoErronea
             jmp  menuInicial
+        notificarGameOver:
+            imprimirEnConsola gameOver
+            jmp menuInicial
+        notificarJugadaExitosa:
+            imprimirEnConsola partidaExitosa
+            jmp menuInicial
 	main endp
 
     ;==================    PROCEDIMIENTOS:    ============================
@@ -382,13 +402,36 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     establecerModoTexto endp
 
     establecerValoresInicialesPartida proc
-        MOV DS:[Configurador.tiempoActualMilis],0
-        MOV DS:[Configurador.tiempoActualSegs],0
-        MOV DS:[Configurador.nivelActual],1
+        MOV DS:[Configurador.tiempoActualMilis],0 ;evaluaciones por milisegundo
+        MOV DS:[Configurador.tiempoActualSegs],0 ;evaluaciones por segundo
+        MOV DS:[Configurador.nivelActual],1 
         MOV DS:[Configurador.estadoJuego], indicadorJuegoActivo
         MOV DS:[Configurador.estadoPartida], indicadorPartidaPerdida
+        MOV pelota.filaActual, posFilaInicialPelota
+        MOV pelota.columnaActual, posColumnaInicialPelota
+        MOV plataformaMovible.filaActual, posFilaInicialPlataforma
+        MOV plataformaMovible.columnaActual, posColumnaInicialPlataforma
+        MOV pelota.estadoDireccion, direccionNoroesteActiva
+        call reiniciarCronometro
+        call reiniciarTiempo
+        call reiniciarPuntajeJuego
         ret 
     establecerValoresInicialesPartida endp
+        
+    cambiarNivel proc
+        MOV DS:[Configurador.tiempoActualMilis],0 ;evaluaciones por milisegundo
+        MOV DS:[Configurador.tiempoActualSegs],0 ;evaluaciones por segundo
+        inc DS:[Configurador.nivelActual]
+        MOV DS:[Configurador.estadoJuego], indicadorJuegoActivo
+        MOV DS:[Configurador.estadoPartida], indicadorPartidaPerdida
+        ;Debemos regresar la pelota a su lugar, ya que se encuntra n el ounto de "fin de juego"
+        MOV pelota.filaActual, posFilaInicialPelota
+        MOV pelota.columnaActual, posColumnaInicialPelota
+        MOV pelota.estadoDireccion, direccionNoroesteActiva
+        call establecerDireccionVideo
+        limpiarEscenario
+        ret
+    cambiarNivel endp
 
 
 
@@ -414,6 +457,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         cmp  DS:[Configurador.estadoPartida],indicadorPartidaPerdida
         je regresarMenuPrincipal
         subirNivel:
+            call cambiarNivel
             call pintarSegundoNivel
         regresarMenuPrincipal:
             ;**agregar datos a archvios**
@@ -425,24 +469,30 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         call dibujarMarcoGrafico
         call dibujarPlataforma
         call dibujarPelotaEstandar
-        dibujarCaja
-        pedirTecla:
-            ; esperar por tecla
-            mov ah,10h
-            int 16h  
-        ret
+        dibujarCaparazon
+        call imprimirDatosDeNivel
+        chequearCambios 
+        cmp  DS:[Configurador.estadoJuego],indicadorPartidaGanada
+        je subirNivel
+        cmp  DS:[Configurador.estadoPartida],indicadorPartidaPerdida
+        je regresarMenuPrincipal
+        subirNivel:
+            call cambiarNivel
+            call pintarTercerNivel
+        regresarMenuPrincipal:
+            ;**agregar datos a archvios**
+            ret ;si pierde alguno de los niveles regresa al menu principal
     pintarSegundoNivel endp
 
     pintarTercerNivel proc
         call dibujarMarcoGrafico
         call dibujarPlataforma
         call dibujarPelotaEstandar
-        dibujarMensajeColorido
-        pedirTecla:
-            ; esperar por tecla
-            mov ah,10h
-            int 16h  
-        ret
+        dibujarCaparazon
+        call imprimirDatosDeNivel
+        chequearCambios  ;aqui no se compaan los estados dado que es el ultimo nivel, siempre saldrá del juego
+        regresarMenuPrincipal:
+            ret ;si pierde alguno de los niveles regresa al menu principal
     pintarTercerNivel endp
 
     pintarEscenario proc
@@ -609,7 +659,8 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             mul bx
             add ax, cx; ax es sumado con la columna actual
             MOV di, ax; lo asignamos a DI para usarlo como indice de busqueda
-            MOV al, DS:[Configurador.controladorDeColores[di]]
+            call establecerDireccionVideo
+            MOV al, [di] ; AL recibe el color de ese pixel
         regresarValoresOriginales:
             POP DI
             POP DX
@@ -625,23 +676,23 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         PUSH CX
         PUSH DX
         PUSH DI
-        call establecerDireccionVideo
+        ;call establecerDireccionVideo
         desplazarmeIzquierda:
             dec cx
-            call obtenerColorPixel
-            ;call obtenerColorPorMatrizControl
-            call establecerSegmentoDatos
+            ;call obtenerColorPixel
+            call obtenerColorPorMatrizControl
+            ;call establecerSegmentoDatos
             cmp al, colorNegroGrafico
             je restablecerColumnaUtil
             jmp desplazarmeIzquierda
         restablecerColumnaUtil:
             inc cx
         elevarFila:
-            call establecerDireccionVideo
+            ;call establecerDireccionVideo
             dec dx
-            call obtenerColorPixel
-            ;call obtenerColorPorMatrizControl
-            call establecerSegmentoDatos
+            ;call obtenerColorPixel
+            call obtenerColorPorMatrizControl
+            ;call establecerSegmentoDatos
             cmp al, colorNegroGrafico
             je restablecerFilaUtil
             cmp al, pelota.colorActual
@@ -659,6 +710,8 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             ;dibujarBloque
             call establecerSegmentoDatos
             call incrementarPuntos
+            call decrecerBloquesDestruibles
+            call verificarPasoDeNivel
             MOV DS:[Configurador.controladorBloque], indicadorBloqueEliminado
             ;call alternarRebote   
             POP DI
@@ -669,7 +722,33 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             ret
     destruirBloqueDesdeOrigen endp
 
+    verificarReboteNoDestructivo proc
+        PUSH DX
+        PUSH CX
+        cmp pelota.estadoDireccion, direccionNoresteActiva
+        je noEvaluar
+        cmp pelota.estadoDireccion, direccionNoroesteActiva
+        je noEvaluar
+        verificarColor:
+            MOV DX, pelota.filaActual
+            ADD DX, pelota.pixelesAlto
+            ADD DX, 2 ;espaciado para evitar desfase de choque
+            MOV CX, pelota.columnaActual
+            call obtenerColorPorMatrizControl
+            call establecerSegmentoDatos
+            cmp al, colorNegroGrafico
+            je noEvaluar
+            cmp dx, posFilaInicialPlataforma
+            jne noEvaluar
+            call alternarReboteVertical
+        noEvaluar:
+            POP CX
+            POP DX
+            ret
+    verificarReboteNoDestructivo endp
+
     delimitarSecuenciaDestruccionBloques proc
+        call verificarReboteNoDestructivo ;verifica el rebote de la plataforma
         restringirDestruccionLimites:
             MOV dx, posMargenMinimoVertical
             inc dx; si estuviera uno antes/a la par del margen minimo vertical se restringe
@@ -677,7 +756,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             je destruccionFinalizada
             MOV dx, posMargenMaximoVertical
             sub dx, pelota.pixelesAncho
-            dec dx; si estuviera uno antes/a la par del margen maximo vertical se restringe
+            ;inc dx; si estuviera uno antes/a la par del margen maximo vertical se restringe
             cmp pelota.columnaActual, dx
             je destruccionFinalizada
             MOV dx, posMargenMinimoHorizontal
@@ -689,15 +768,6 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             dec dx; si estuviera uno antes/por endima  del margen maximo horizontal se restringe
             cmp pelota.filaActual, dx
             je verificarFinalizacionJuego
-            MOV dx, posFilaInicialPlataforma
-            SUB dx, pelota.pixelesAlto ; la altura ocuoa espacio antes de que llegue exactamente a esa fila
-            dec dx; si estuviera uno antes/por endima  de la palataforma se debe rebotar pero no destruir
-            cmp pelota.filaActual, dx
-            je rebotarSinDestruccion
-            jmp verificarDestruccionPorEsquinas
-        rebotarSinDestruccion:
-           call alternarReboteVertical
-           jmp destruccionFinalizada
         verificarDestruccionPorEsquinas:
            ;call evaluarChoqueEsquinas
            cmp DS:[Configurador.controladorBloque], indicadorBloqueEliminado
@@ -711,7 +781,8 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             jmp destruccionFinalizada
         verificarFinalizacionJuego:
             ;call establecerSegmentoDatos
-            MOV DS:[Configurador.estadoJuego], indicadorJuegoInactivo
+            MOV DS:[Configurador.estadoJuego], indicadorJuegoInactivo ;cambiar esot a INACTIVO finaliza el ciclo evaluativo que controla el nivel
+            MOV DS:[Configurador.estadoPartida], indicadorPartidaPerdida
         verificarDestruccionHorizontal:
             evaluarRebotesHorizontalesDestructivos
             ;call establecerSegmentoDatos
@@ -1134,7 +1205,6 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     incrementarPuntos endp
 
     incrementarTiempo proc
-        ;inc DS:[Configurador.puntajeActual]
         ;0->centenas
         ;1->decenas
         ;2->unidades
@@ -1162,6 +1232,53 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         finDeSuma:    
             ret
     incrementarTiempo endp
+
+    reiniciarTiempo proc
+        MOV tiempoEstable[2], 0 ;unidades
+        MOV tiempoEstable[1], 0 ;decenas
+        MOV tiempoEstable[0], 0; centenas
+        ret
+    reiniciarTiempo endp
+
+    reiniciarCronometro proc
+        MOV visorReloj[3], 0 ;unidades de segundo
+        MOV visorReloj[2], 0 ;decenas de segundo
+        MOV visorReloj[0], 0; minutos
+        ret
+    reiniciarCronometro endp
+
+    reiniciarPuntajeJuego proc
+        MOV visorPuntos[2], 0 ;unidades
+        MOV visorPuntos[1], 0 ;decenas
+        MOV visorPuntos[0], 0; centenas
+        ret
+    reiniciarPuntajeJuego endp
+
+    incrementarBloquesDestruibles proc
+        call establecerSegmentoDatos
+        inc DS:[Configurador.bloquesGenerados]
+        call establecerDireccionVideo 
+        ;esto se haxe ya que este proc solo se usará al momento de generar el nivel,
+        ;donde se usará constantemente el modo video
+        ret
+    incrementarBloquesDestruibles endp
+
+    decrecerBloquesDestruibles proc
+        call establecerSegmentoDatos
+        dec DS:[Configurador.bloquesGenerados]
+        ret
+    decrecerBloquesDestruibles endp
+
+    verificarPasoDeNivel proc
+        cmp DS:[Configurador.bloquesGenerados], 0
+        je pasarDeNivel
+        jmp proseguirMismoNivel
+        pasarDeNivel:
+            MOV DS:[Configurador.estadoPartida],indicadorPartidaGanada; nos permite pasar al siguiente nivel
+            MOV DS:[Configurador.estadoJuego],indicadorJuegoInactivo; permite salirnos de la evaluación de nivel
+        proseguirMismoNivel:
+            ret
+    verificarPasoDeNivel endp
 
     retenerPausaEvaluada proc
         PUSH AX
