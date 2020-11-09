@@ -405,3 +405,150 @@ validarParametrosReporte macro
         accionarTopResultados bl, ah
         jmp seccionTops ;hay que validar una paequeña pausa
 endm
+
+obtenerDataOrdenamientos macro 
+    LOCAL verificarFin, ignorarUsername, ignorarNivel, obtenerIndice, obtenerPuntaje, incrementarPuntajes, obtenerTiempo, incrementarTiempos,ignorarSeparadorFila, finalizado 
+    PUSH SI
+    PUSH DI
+    PUSH AX 
+    PUSH Bx 
+    ;Dado que para pasar el parámetro usamos bh pero este registro
+    ;puede alterarse con la apertura y lectura del archivo entonces se hace un push 
+    MOV dl, 1 ;indica que se use la ruta del archivo de indice 1 (Rounds.txt)
+    MOV bl, 1 ;indicador de apertura y lectura archivo 
+    accionarArchivoEnrutado dl, bl ;se abre y lee el contenido de se archivo 
+    cerrarArchivo controladorFicheros ;se cierra el archivo para evitar problemas posteriores
+    POP Bx 
+    POP AX
+    ;con el pop recuperamso los valores de la pila que se metio previamente
+    xor si, si;inicializamos nuestros controles de indice
+    xor di, di
+    xor cl, cl;reestablecemos a 0 nuestro contadores
+    xor ch, ch;
+
+    PUSH DI; guardamos un cero en pila para que el proceso sepa por donde empezar en "obtenerIndice"
+    jmp ignorarUsername
+    verificarFin:
+      inc si
+      cmp  lectorEntradaFicheros[si], finCadena
+      je finalizado 
+    ignorarUsername:
+       inc si ;
+       cmp lectorEntradaFicheros[si], coma
+       je  ignorarNivel
+       jmp ignorarUsername
+    ignorarNivel: 
+       inc si
+       cmp lectorEntradaFicheros[si], coma
+       je  obtenerIndice
+       jmp ignorarNivel
+    obtenerIndice:
+      POP DI
+      ;Si acaba de inicar el proceso obtendrá un cero, si no entonces obtendra el
+      ;idice guasrdado en la etiqueta "guardar indice", y asi saber que posicion
+      ;del vector nos toca para seguir guardando
+      MOV AX, DI; guardamos una copia
+      inc si
+    obtenerPuntaje:   
+       MOV bl, lectorEntradaFicheros[si]
+       MOV puntajesDesordenados[di], bl
+       inc si
+       inc di
+       cmp lectorEntradaFicheros[si], coma
+       je  incrementarPuntajes
+       jmp obtenerPuntaje 
+    incrementarPuntajes:
+      inc DS:[Graficador.cuentaPuntajesActuales]
+    guardarIndice:
+      ;dado que tanto puntajes como tiempos manejan una máximo de evaluación
+      ;por decenas, entonces ambos tienen la misma loingitud, por lo que DI
+      ;actual es el próximo indice a usar en futuras evaluaciones
+      PUSH DI
+      MOV DI, AX; a DI le asignamos la copia guardad del indice que necesitamos
+      inc si
+    obtenerTiempo:
+       MOV bl, lectorEntradaFicheros[si]
+       MOV tiemposDesordenados[di], bl 
+       inc si
+       inc di
+       cmp lectorEntradaFicheros[si], puntoComa
+       je  incrementarTiempos
+       jmp obtenerTiempo   
+    incrementarTiempos:
+      inc DS:[Graficador.cuentaTiemposActuales]
+    ignorarSeparadorFila: 
+       inc si ;retorno de carro
+       inc si  ;salto de linea
+       jmp verificarFin                  
+    finalizado:
+       inc DI
+       xor si, si
+       xor di, di
+       POP DI
+       POP SI   
+       ;imprimirEnConsola lectorEntradaFicheros[0]
+       ;imprimirEnConsola tiemposDesordenados
+       imprimirEnConsola puntajesDesordenados
+       imprimirEnConsola debug
+endm 
+
+ordenarBurbujaPuntajes macro indicadorOrden  
+   LOCAL elegirOrden, ordenarAscendente,desplazarmeSiguienteDesc, intercambiarPuntajesAsc,desplazarmeSiguienteAsc, verificarRepeticionAsc, ordenarDescendente, intercambiarPuntajesDesc,verificarRepeticionDesc, fin
+   PUSH SI
+   PUSH DI
+   MOV ch, DS:[Graficador.cuentaPuntajesActuales]
+   MOV cl, ch ;la copia servirá para el numero de iteraciones, iteraciones = numElementos
+   dec ch; burbuja realiza comparaciones, donde comparaciones = numElementos - 1 
+   MOV AH, indicadorOrden
+   elegirOrden:
+      MOV SI, 0
+      MOV DI, digitosMaximosEvaluacion ;dado que entre centenas, decenas y unidades hay 3 posiciones de diferencia
+      MOV ch, DS:[Graficador.cuentaPuntajesActuales]
+      dec ch
+      cmp ah, 1; 1 indica ascendentes
+      je  ordenarAscendente
+      jmp ordenarDescendente
+      ordenarAscendente:
+         call compararPuntajes ; dl = 1 si pos1 > pos 2
+         cmp dl, 1
+         je intercambiarPuntajesAsc
+         jmp desplazarmeSiguienteAsc
+         desplazarmeSiguienteAsc:
+            ADD SI, digitosMaximosEvaluacion
+            ADD DI, digitosMaximosEvaluacion
+            jmp verificarRepeticionAsc
+         intercambiarPuntajesAsc:
+            call intercambiarPuntaje
+         verificarRepeticionAsc:   
+            dec ch
+            cmp ch, 0
+            jg ordenarAscendente
+            jmp fin
+      ordenarDescendente:
+         call compararPuntajes ; dl = 0 si pos1 <  pos 2
+         cmp dl, 0
+         je intercambiarPuntajesDesc
+         jmp desplazarmeSiguienteDesc
+         desplazarmeSiguienteDesc:
+            ADD SI, digitosMaximosEvaluacion
+            ADD DI, digitosMaximosEvaluacion
+            jmp verificarRepeticionDesc
+         intercambiarPuntajesDesc:
+            call intercambiarPuntaje
+         verificarRepeticionDesc:   
+            dec ch
+            cmp ch, 0
+            jg ordenarDescendente
+            jmp fin
+   fin:
+      dec cl
+      cmp cl, 0
+      jg elegirOrden
+      POP DI
+      POP SI
+endm
+
+
+
+
+

@@ -9,9 +9,13 @@ endm
 
 
 imprimirEnConsola macro cadena
+    PUSH AX
+    PUSH DX
     MOV ah,subFuncionVerCadena; asignamos la subfunción de la interupción
     MOV dx,offset cadena ;proporcionamos la dirección de desplazamiento
     int funcionesDOS
+    POP DX
+    POP AX
 endm   
 
 mostrarEncabezado macro    

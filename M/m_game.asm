@@ -232,7 +232,7 @@ evaluarRebotesVerticalesDestructivos macro
         MOV bx, pelota.filaActual 
         ADD bx, pelota.pixelesAlto
         ;Si nos posicionamos en la (fila actual + pixeles Alto) estamos poosicionados en 
-        ;la parte superior de un psobile bloque por debajo de la pelota, se consideran los
+        ;la parte superior de un posible bloque por debajo de la pelota, se consideran los
         ;pixeles de alto ya que es el espacio del punto de dibujo de la 
         ;pelota + el espacio que ocupa verticalmente
         MOV dx, bx;dx debe tener el valor de la fila

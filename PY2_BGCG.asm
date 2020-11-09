@@ -28,6 +28,7 @@ EtildadaMinus EQU 82h ;82H -> 130 -> é
 ItildadaMinus EQU 0A1h ;A1H -> 161 -> í
 OtildadaMinus EQU 0A2h ;A2H -> 162 -> ó
 coma EQU 2ch ;2ch-> 44 -> , 
+guion EQU 2dh; 2dh -> 45 -> "-"
 punto EQU 2eh ;2eh-> 46 -> ,  
 puntoComa EQU 3bh ;3bh-> 59 -> ;
 espacio EQU 20h;20h->32 -> espacio en blanco  
@@ -96,6 +97,7 @@ columnaValorNivel EQU 16 ; ubicación del valor del nivel
 columnaPuntajeActual EQU 25;ubicación de los puntos actuales
 columnaRelojTiempo EQU 33 ;ubicación del reloj que indica el tiempo en el juego
 columnaNombreOrdenamiento EQU 1 ; ubicación del nombre del ordenamiento actual del gráfico
+digitosMaximosEvaluacion EQU 3 ; dado que solo se aceptan como maximo centenas (999)  para elmanejo de resultados, se establece 3 digitos como máximo
   
 ;=== COLORES EQUIVALENTES === 
 colorBlancoGrafico EQU 0fh
@@ -146,6 +148,11 @@ tiempoEstable db 0,0,0,finCadena; el tiempo que se registra en los ficheros
 ;saltoLn para ":", de @ para "p", de "D" para t y de "C" pata s 
 visorReloj db 0,saltoLn,0,0, finCadena ;0:00
 visorPuntos db 0,0,0,'@','D','C',finCadena  ;000pts 
+;Arreglos para ordenamientos:
+puntajesDesordenados db 2000 dup(finCadena) 
+tiemposDesordenados db 2000 dup(finCadena)
+auxiliarDeCambioDigito db 10 dup(finCadena) 
+auxiliarDeCambioContenidoFila db 200 dup(finCadena) 
   
 ;Rutas ejecutando desde DosBox:
 nombreArchivoJugadores db 'B\Gamers.txt',finRutaFichero ;En emu8086 es 'C:\B\Gamers.txt',finRutaFichero
@@ -251,17 +258,24 @@ Configurador STRUC
    tiempoActualSegs db ?; sirve para evaluar cosas cada segundo
    estadoJuego db ?; 00h juego inactivo, 01h juego activo
    estadoPartida db ?; 00h partiuda perdida, 01h partida ganada
-   controladorDeColores db 64000 dup(colorNegroGrafico);
    controladorBloque db ? 
 Configurador ENDS 
 ;Guarda toda la configuracio´n de los niveles del Ball Breaker
 
+;Graficador STRUC
+;   velocidad db ?
+;   tiempo db ?
+;   nombreOrdenamiento db ?
+;Graficador ENDS 
+
+
 Graficador STRUC
-   velocidad db ?
-   tiempo db ?
-   nombreOrdenamiento db ?
-Graficador ENDS 
+   cuentaPuntajesActuales db ?
+   cuentaTiemposActuales db ?
+Graficador ENDS
 ;Guarda toda la configuracio´n par al animación de oso gráficos de ordenamientos
+
+
 
 ElementoGrafico STRUC
    pixelesAncho dw ?
@@ -286,25 +300,25 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
 
 ;================== SEGMENTO DE CODIGO ===========================
 .code 
-        call establecerSegmentoDatos
-        ;call establecerValoresInicialesPartida
-        ;call establecerModoVideo
-        ;call pintarPrimerNivel
-
-        ;limpiarEscenario
-        ;call pintarSegundoNivel
-        ;limpiarEscenario
-        ;call pintarTercerNivel
-        ;call barraDib
-        
-        ;call solicitarTeclaEspacio
-        ;call establecerModoTexto
+    call establecerSegmentoDatos
 
     ;========================= MAIN ==============================================
 
 	main proc 
 	    IniciarPrograma:
-		    mostrarEncabezado
+            call establecerValoresInicialesOrdenamiento
+            obtenerDataOrdenamientos
+            ;MOV ah, 0
+            ordenarBurbujaPuntajes 1
+            ;MOV SI, 0
+            ;MOV DI, digitosMaximosEvaluacion
+            ;call intercambiarPuntaje
+            ;call intercambiarPuntaje
+            imprimirEnConsola puntajesDesordenados; ya ordenados
+            imprimirEnConsola debug
+            ordenarBurbujaPuntajes 0
+            imprimirEnConsola puntajesDesordenados
+		    ;mostrarEncabezado
 		    menuInicial:
 			    mostrarMenuPrincipal
 			    LecturaPrincipal:               
@@ -329,7 +343,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             call establecerModoVideo
             call pintarPrimerNivel
             call establecerModoTexto
-            finalizarJuego
+            ;finalizarJuego
 		    cmp DS:[Configurador.estadoPartida], indicadorPartidaGanada
             je  notificarJugadaExitosa
             jmp notificarGameOver   
@@ -471,6 +485,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         call dibujarPelotaEstandar
         dibujarCaparazon
         call imprimirDatosDeNivel
+        call solicitarTeclaEspacio
         chequearCambios 
         cmp  DS:[Configurador.estadoJuego],indicadorPartidaGanada
         je subirNivel
@@ -489,6 +504,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         call dibujarPelotaEstandar
         dibujarCaparazon
         call imprimirDatosDeNivel
+        call solicitarTeclaEspacio
         chequearCambios  ;aqui no se compaan los estados dado que es el ultimo nivel, siempre saldrá del juego
         regresarMenuPrincipal:
             ret ;si pierde alguno de los niveles regresa al menu principal
@@ -1308,6 +1324,152 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     retenerPausaEvaluada endp
 
     ;==============================================================================================
+
+    ;===============================================================================================
+
+    ;=============================== ORDENAMIENTOS: ==================================================
+
+    ;ejecutarOrdenamiento proc
+     ;   call establecerValoresInicialesOrdenamiento
+      ;  obtenerDataOrdenamientos
+       ; ret
+    ;ejecutarOrdenamiento endp
+    
+    establecerValoresInicialesOrdenamiento proc
+        MOV DS:[Graficador.cuentaPuntajesActuales],0    
+        MOV DS:[Graficador.cuentaTiemposActuales],0 
+        ret 
+    establecerValoresInicialesOrdenamiento endp
+
+    intercambiarPuntaje proc
+        PUSH DX
+        PUSH CX
+        PUSH BX
+        PUSH DI
+        ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
+        ;DI en "emplearCopiaAuxiliar", lo que alteraria su valor
+        XOR cx, cx ;inicializamos en 0 para realizar las cuentas
+        xor di, di 
+        MOV BX, SI 
+        ;necesitamos guardar SI ya que se usará para trasladar al auxiliar la información,
+        ;pero necesitamos esa misma posición original para realizar despues el intercambio
+        emplearCopiaAuxiliar:
+            MOV dl, puntajesDesordenados[si]
+            MOV auxiliarDeCambioDigito[di], dl 
+            ;se maneja con DI ya que SI llevará un indice que se increntará
+            ;constantemente durante el ordenamiento, y al auxiliar isempre
+            ; debemos evaluarlo iniciando desde 0, 
+            inc si
+            inc di
+            inc cx
+            cmp cx, digitosMaximosEvaluacion  
+            jl emplearCopiaAuxiliar ;mientras las evaluaciones no pasen el número de digitos max (3)
+            xor cx, cx
+            POP DI ;Recuperamos el valor original actual de DI
+            MOV SI, BX ;obtenemos el valor original de SI actual
+        intercambiar:
+            PUSH DI 
+            ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
+            ;DI para el acceso al auxiliar, lo que alteraria su valor
+            MOV dl, puntajesDesordenados[di]
+            MOV puntajesDesordenados[si], dl
+            MOV DI, cx; la cuenta coincide con la posicipón necesaria en el acceso a auxiliar
+            MOV dl, auxiliarDeCambioDigito[di]
+            POP DI ;recuperamos verdadero el valor que necesitamos
+            MOV puntajesDesordenados[di], dl
+            inc si
+            inc di
+            inc cx 
+            cmp cx, digitosMaximosEvaluacion
+            jl intercambiar
+        fin:
+            ;Dada la ultima iteración tanto SI como DI queadan poisicionados
+            ;en el indice exacto donde se necesita para próximas evaluaciones
+            ;cuando se emplea en ordenamientos
+            POP BX
+            POP CX
+            POP DX
+            ret
+    intercambiarPuntaje endp
+
+    intercambiarTiempo proc
+        PUSH DX
+        PUSH CX
+        MOV cl, 0
+        PUSH SI
+        emplearCopiaAuxiliar:
+            MOV dl, tiemposDesordenados[si]
+            MOV auxiliarDeCambioDigito[si], dl 
+            inc si
+            inc cl
+            cmp cl, digitosMaximosEvaluacion  
+            jle emplearCopiaAuxiliar
+            MOV cl, 0
+            POP SI
+        intercambiar:
+            MOV dl, tiemposDesordenados[di]
+            MOV tiemposDesordenados[si], dl
+            MOV dl, auxiliarDeCambioDigito[si]
+            MOV tiemposDesordenados[di], dl
+            inc si
+            inc di
+            inc cl 
+            cmp cl, digitosMaximosEvaluacion
+            jle intercambiar
+        fin:
+            POP CX
+            POP DX
+            ret
+    intercambiarTiempo endp
+
+    compararPuntajes proc
+        PUSH AX ;En la posicion actual de si y di realiza la comparación
+        PUSH SI 
+        ;en este proc se alteran SI y DI pero como solo es para comparar
+        ;usamos la pila para guardar el valor original que servirá en otras subrutinas
+        PUSH DI
+        compararCentenas:
+            MOV al, puntajesDesordenados[di]
+            cmp puntajesDesordenados[si], al
+            ja  indicarMayor ;pos 1 > pos 2
+            cmp puntajesDesordenados[si], al
+            jb  indicarMenor ;pos 2 > pos 1
+        compararDecenas:
+            inc si
+            inc di
+            MOV al, puntajesDesordenados[di]
+            cmp puntajesDesordenados[si], al
+            ja  indicarMayor ;pos 1 > pos 2
+            cmp puntajesDesordenados[si], al
+            jb  indicarMenor ;pos 2 > pos 1
+        compararUnidades:
+            inc si
+            inc di
+            MOV al, puntajesDesordenados[di]
+            cmp puntajesDesordenados[si], al
+            ja  indicarMayor ;pos 1 > pos 2
+            cmp puntajesDesordenados[si], al
+            jb  indicarMenor ;pos 2 > pos 1
+            cmp puntajesDesordenados[si], al
+            je indicarIgual
+        indicarMayor:; dl == 1, indicando que pos1 > pos2
+            MOV dl, 1
+            cmp dl, 1 
+            je finComparacionPuntajes
+        indicarMenor:
+            MOV dl, 0
+            cmp dl, 0 
+            je finComparacionPuntajes
+        indicarIgual:
+            MOV dl, 2
+            cmp dl, 2
+            je finComparacionPuntajes
+        finComparacionPuntajes:
+            POP DI
+            POP SI
+            POP AX
+            ret
+    compararPuntajes endp 
 
 
 
