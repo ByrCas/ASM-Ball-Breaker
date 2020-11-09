@@ -492,7 +492,7 @@ obtenerDataOrdenamientos macro
        imprimirEnConsola debug
 endm 
 
-ordenarBurbujaPuntajes macro indicadorOrden  
+ordenarElementosBurbuja macro indicadorOrden,indicadorIntercambio, indicadorComparacion  
    LOCAL elegirOrden, ordenarAscendente,desplazarmeSiguienteDesc, intercambiarPuntajesAsc,desplazarmeSiguienteAsc, verificarRepeticionAsc, ordenarDescendente, intercambiarPuntajesDesc,verificarRepeticionDesc, fin
    PUSH SI
    PUSH DI
@@ -505,11 +505,12 @@ ordenarBurbujaPuntajes macro indicadorOrden
       MOV DI, digitosMaximosEvaluacion ;dado que entre centenas, decenas y unidades hay 3 posiciones de diferencia
       MOV ch, DS:[Graficador.cuentaPuntajesActuales]
       dec ch
-      cmp ah, 1; 1 indica ascendentes
-      je  ordenarAscendente
-      jmp ordenarDescendente
+      cmp ah, 0; 0 indica descendentes
+      je  ordenarDescendente
+      jmp ordenarAscendente
       ordenarAscendente:
-         call compararPuntajes ; dl = 1 si pos1 > pos 2
+         MOV AL, indicadorComparacion
+         call elegirComparacion ; dl = 1 si pos1 > pos 2
          cmp dl, 1
          je intercambiarPuntajesAsc
          jmp desplazarmeSiguienteAsc
@@ -518,14 +519,16 @@ ordenarBurbujaPuntajes macro indicadorOrden
             ADD DI, digitosMaximosEvaluacion
             jmp verificarRepeticionAsc
          intercambiarPuntajesAsc:
-            call intercambiarPuntaje
+            MOV AL, indicadorIntercambio
+            call elegirIntercambio
          verificarRepeticionAsc:   
             dec ch
             cmp ch, 0
             jg ordenarAscendente
             jmp fin
       ordenarDescendente:
-         call compararPuntajes ; dl = 0 si pos1 <  pos 2
+         MOV AL, indicadorComparacion
+         call elegirComparacion ; dl = 0 si pos1 <  pos 2
          cmp dl, 0
          je intercambiarPuntajesDesc
          jmp desplazarmeSiguienteDesc
@@ -534,7 +537,8 @@ ordenarBurbujaPuntajes macro indicadorOrden
             ADD DI, digitosMaximosEvaluacion
             jmp verificarRepeticionDesc
          intercambiarPuntajesDesc:
-            call intercambiarPuntaje
+            MOV AL, indicadorIntercambio
+            call elegirIntercambio
          verificarRepeticionDesc:   
             dec ch
             cmp ch, 0

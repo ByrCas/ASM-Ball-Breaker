@@ -308,16 +308,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
 	    IniciarPrograma:
             call establecerValoresInicialesOrdenamiento
             obtenerDataOrdenamientos
-            ;MOV ah, 0
-            ordenarBurbujaPuntajes 1
-            ;MOV SI, 0
-            ;MOV DI, digitosMaximosEvaluacion
-            ;call intercambiarPuntaje
-            ;call intercambiarPuntaje
-            imprimirEnConsola puntajesDesordenados; ya ordenados
-            imprimirEnConsola debug
-            ordenarBurbujaPuntajes 0
-            imprimirEnConsola puntajesDesordenados
+            call ordenarTiemposDescendentes
 		    ;mostrarEncabezado
 		    menuInicial:
 			    mostrarMenuPrincipal
@@ -1392,36 +1383,6 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             ret
     intercambiarPuntaje endp
 
-    intercambiarTiempo proc
-        PUSH DX
-        PUSH CX
-        MOV cl, 0
-        PUSH SI
-        emplearCopiaAuxiliar:
-            MOV dl, tiemposDesordenados[si]
-            MOV auxiliarDeCambioDigito[si], dl 
-            inc si
-            inc cl
-            cmp cl, digitosMaximosEvaluacion  
-            jle emplearCopiaAuxiliar
-            MOV cl, 0
-            POP SI
-        intercambiar:
-            MOV dl, tiemposDesordenados[di]
-            MOV tiemposDesordenados[si], dl
-            MOV dl, auxiliarDeCambioDigito[si]
-            MOV tiemposDesordenados[di], dl
-            inc si
-            inc di
-            inc cl 
-            cmp cl, digitosMaximosEvaluacion
-            jle intercambiar
-        fin:
-            POP CX
-            POP DX
-            ret
-    intercambiarTiempo endp
-
     compararPuntajes proc
         PUSH AX ;En la posicion actual de si y di realiza la comparación
         PUSH SI 
@@ -1471,6 +1432,170 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             ret
     compararPuntajes endp 
 
+    intercambiarTiempo proc
+        PUSH DX
+        PUSH CX
+        PUSH BX
+        PUSH DI
+        ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
+        ;DI en "emplearCopiaAuxiliar", lo que alteraria su valor
+        XOR cx, cx ;inicializamos en 0 para realizar las cuentas
+        xor di, di 
+        MOV BX, SI 
+        ;necesitamos guardar SI ya que se usará para trasladar al auxiliar la información,
+        ;pero necesitamos esa misma posición original para realizar despues el intercambio
+        emplearCopiaTiempoAuxiliar:
+            MOV dl, tiemposDesordenados[si]
+            MOV auxiliarDeCambioDigito[di], dl 
+            ;se maneja con DI ya que SI llevará un indice que se increntará
+            ;constantemente durante el ordenamiento, y al auxiliar isempre
+            ; debemos evaluarlo iniciando desde 0, 
+            inc si
+            inc di
+            inc cx
+            cmp cx, digitosMaximosEvaluacion  
+            jl emplearCopiaTiempoAuxiliar ;mientras las evaluaciones no pasen el número de digitos max (3)
+            xor cx, cx
+            POP DI ;Recuperamos el valor original actual de DI
+            MOV SI, BX ;obtenemos el valor original de SI actual
+        intercambiarTm:
+            PUSH DI 
+            ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
+            ;DI para el acceso al auxiliar, lo que alteraria su valor
+            MOV dl, tiemposDesordenados[di]
+            MOV tiemposDesordenados[si], dl
+            MOV DI, cx; la cuenta coincide con la posicipón necesaria en el acceso a auxiliar
+            MOV dl, auxiliarDeCambioDigito[di]
+            POP DI ;recuperamos verdadero el valor que necesitamos
+            MOV tiemposDesordenados[di], dl
+            inc si
+            inc di
+            inc cx 
+            cmp cx, digitosMaximosEvaluacion
+            jl intercambiarTm
+        finIntercambioTiempo:
+            ;Dada la ultima iteración tanto SI como DI queadan poisicionados
+            ;en el indice exacto donde se necesita para próximas evaluaciones
+            ;cuando se emplea en ordenamientos
+            POP BX
+            POP CX
+            POP DX
+            ret
+    intercambiarTiempo endp
 
+    compararTiempos proc
+        PUSH AX ;En la posicion actual de si y di realiza la comparación
+        PUSH SI 
+        ;en este proc se alteran SI y DI pero como solo es para comparar
+        ;usamos la pila para guardar el valor original que servirá en otras subrutinas
+        PUSH DI
+        compararCentenas:
+            MOV al, tiemposDesordenados[di]
+            cmp tiemposDesordenados[si], al
+            ja  indicarMayor ;pos 1 > pos 2
+            cmp tiemposDesordenados[si], al
+            jb  indicarMenor ;pos 2 > pos 1
+        compararDecenas:
+            inc si
+            inc di
+            MOV al, tiemposDesordenados[di]
+            cmp tiemposDesordenados[si], al
+            ja  indicarMayor ;pos 1 > pos 2
+            cmp tiemposDesordenados[si], al
+            jb  indicarMenor ;pos 2 > pos 1
+        compararUnidades:
+            inc si
+            inc di
+            MOV al, tiemposDesordenados[di]
+            cmp tiemposDesordenados[si], al
+            ja  indicarMayor ;pos 1 > pos 2
+            cmp tiemposDesordenados[si], al
+            jb  indicarMenor ;pos 2 > pos 1
+            cmp tiemposDesordenados[si], al
+            je indicarIgual
+        indicarMayor:; dl == 1, indicando que pos1 > pos2
+            MOV dl, 1
+            cmp dl, 1 
+            je finComparacionTiempos
+        indicarMenor:
+            MOV dl, 0
+            cmp dl, 0 
+            je finComparacionTiempos
+        indicarIgual:
+            MOV dl, 2
+            cmp dl, 2
+            je finComparacionTiempos
+        finComparacionTiempos:
+            POP DI
+            POP SI
+            POP AX
+            ret
+    compararTiempos endp 
+
+    elegirIntercambio proc
+        PUSH AX
+        ;Asume que AL tiene el indicador de cual intercambio usar
+        cmp al, 0 ;o es indicador de intercambio de puntajes
+        je intercambiarParejaPuntajes
+        jmp intercambioParejaTiempos
+        intercambiarParejaPuntajes:
+            call intercambiarPuntaje
+            ;cmp al, 0 
+            jmp finalizarIntercambios
+        intercambioParejaTiempos:
+            call intercambiarTiempo
+        finalizarIntercambios:
+            POP AX
+            ret
+    elegirIntercambio endp
+
+    elegirComparacion proc 
+        PUSH AX
+        ;Asume que AL tiene el indicador de cual comparacion usar
+        cmp al, 0 ;o es indicador de intercambio de puntajes
+        je compararParejaPuntajes
+        jmp compararParejaTiempos
+        compararParejaPuntajes:
+            call compararPuntajes
+            ;cmp al, 0 
+            jmp finalizarComparaciones
+        compararParejaTiempos:
+            call compararTiempos
+        finalizarComparaciones:
+            POP AX
+            ret
+    elegirComparacion endp
+
+    ordenarPuntajesAscendentes proc
+        XOR SI, SI
+        XOR DI, DI
+        ordenarElementosBurbuja 1, 0, 0 ; ascendete - puntajes
+        ret
+    ordenarPuntajesAscendentes endp
+
+    ordenarPuntajesDescendentes proc
+        XOR SI, SI
+        XOR DI, DI
+        ordenarElementosBurbuja 0, 0 , 0; descendertee - Puntajes
+        ret
+    ordenarPuntajesDescendentes endp
+
+    ordenarTiemposAscendentes proc
+        XOR SI, SI
+        XOR DI, DI
+        ordenarElementosBurbuja 1, 1,1 ; ascendente - tiempos
+        ret
+    ordenarTiemposAscendentes endp
+
+    ordenarTiemposDescendentes proc
+        XOR SI, SI
+        XOR DI, DI
+        ordenarElementosBurbuja 0, 1,1 ; descendertee - tiempos
+        ret
+    ordenarTiemposDescendentes endp
+
+    ;ordenarPorBubble proc
+    ;    ret
+    ;ordenarPorBubble endp  
 
 end
