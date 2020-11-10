@@ -306,10 +306,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
 
 	main proc 
 	    IniciarPrograma:
-            call establecerValoresInicialesOrdenamiento
-            obtenerDataOrdenamientos
-            call ordenarTiemposDescendentes
-		    ;mostrarEncabezado
+		    mostrarEncabezado
 		    menuInicial:
 			    mostrarMenuPrincipal
 			    LecturaPrincipal:               
@@ -1391,27 +1388,36 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         PUSH DI
         compararCentenas:
             MOV al, puntajesDesordenados[di]
-            cmp puntajesDesordenados[si], al
-            ja  indicarMayor ;pos 1 > pos 2
-            cmp puntajesDesordenados[si], al
-            jb  indicarMenor ;pos 2 > pos 1
+            ADD al, diferenciaASCII
+            MOV ah, puntajesDesordenados[si]
+            ADD ah, diferenciaASCII
+            cmp ah, al
+            jg  indicarMayor ;pos 1 > pos 2
+            cmp ah, al
+            jl  indicarMenor ;pos 2 > pos 1
         compararDecenas:
             inc si
             inc di
             MOV al, puntajesDesordenados[di]
-            cmp puntajesDesordenados[si], al
-            ja  indicarMayor ;pos 1 > pos 2
-            cmp puntajesDesordenados[si], al
-            jb  indicarMenor ;pos 2 > pos 1
+            ADD al, diferenciaASCII
+            MOV ah, puntajesDesordenados[si]
+            ADD ah, diferenciaASCII
+            cmp ah, al
+            jg  indicarMayor ;pos 1 > pos 2
+            cmp ah, al
+            jl  indicarMenor ;pos 2 > pos 1
         compararUnidades:
             inc si
             inc di
             MOV al, puntajesDesordenados[di]
-            cmp puntajesDesordenados[si], al
-            ja  indicarMayor ;pos 1 > pos 2
-            cmp puntajesDesordenados[si], al
-            jb  indicarMenor ;pos 2 > pos 1
-            cmp puntajesDesordenados[si], al
+            ADD al, diferenciaASCII
+            MOV ah, puntajesDesordenados[si]
+            ADD ah, diferenciaASCII
+            cmp ah, al
+            jg  indicarMayor ;pos 1 > pos 2
+            cmp ah, al
+            jl  indicarMenor ;pos 2 > pos 1
+            cmp ah, al
             je indicarIgual
         indicarMayor:; dl == 1, indicando que pos1 > pos2
             MOV dl, 1
@@ -1491,27 +1497,36 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         PUSH DI
         compararCentenas:
             MOV al, tiemposDesordenados[di]
-            cmp tiemposDesordenados[si], al
-            ja  indicarMayor ;pos 1 > pos 2
-            cmp tiemposDesordenados[si], al
-            jb  indicarMenor ;pos 2 > pos 1
+            ADD al, diferenciaASCII
+            MOV ah, tiemposDesordenados[si]
+            ADD ah, diferenciaASCII
+            cmp ah, al
+            jg  indicarMayor ;pos 1 > pos 2
+            cmp ah, al
+            jl  indicarMenor ;pos 2 > pos 1
         compararDecenas:
             inc si
             inc di
             MOV al, tiemposDesordenados[di]
-            cmp tiemposDesordenados[si], al
-            ja  indicarMayor ;pos 1 > pos 2
-            cmp tiemposDesordenados[si], al
-            jb  indicarMenor ;pos 2 > pos 1
+            ADD al, diferenciaASCII
+            MOV ah, tiemposDesordenados[si]
+            ADD ah, diferenciaASCII
+            cmp ah, al
+            jg  indicarMayor ;pos 1 > pos 2
+            cmp ah, al
+            jl  indicarMenor ;pos 2 > pos 1
         compararUnidades:
             inc si
             inc di
             MOV al, tiemposDesordenados[di]
-            cmp tiemposDesordenados[si], al
-            ja  indicarMayor ;pos 1 > pos 2
-            cmp tiemposDesordenados[si], al
-            jb  indicarMenor ;pos 2 > pos 1
-            cmp tiemposDesordenados[si], al
+            ADD al, diferenciaASCII
+            MOV ah, tiemposDesordenados[si]
+            ADD ah, diferenciaASCII
+            cmp ah, al
+            jg  indicarMayor ;pos 1 > pos 2
+            cmp ah, al
+            jl  indicarMenor ;pos 2 > pos 1
+            cmp ah, al
             je indicarIgual
         indicarMayor:; dl == 1, indicando que pos1 > pos2
             MOV dl, 1
@@ -1532,10 +1547,11 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             ret
     compararTiempos endp 
 
+
     elegirIntercambio proc
         PUSH AX
         ;Asume que AL tiene el indicador de cual intercambio usar
-        cmp al, 0 ;o es indicador de intercambio de puntajes
+        cmp lectorEntradaTop[0], '1' ;o es indicador de intercambio de puntajes
         je intercambiarParejaPuntajes
         jmp intercambioParejaTiempos
         intercambiarParejaPuntajes:
@@ -1552,7 +1568,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
     elegirComparacion proc 
         PUSH AX
         ;Asume que AL tiene el indicador de cual comparacion usar
-        cmp al, 0 ;o es indicador de intercambio de puntajes
+        cmp lectorEntradaTop[0], '1' ;o es indicador de intercambio de puntajes
         je compararParejaPuntajes
         jmp compararParejaTiempos
         compararParejaPuntajes:
@@ -1566,36 +1582,65 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             ret
     elegirComparacion endp
 
-    ordenarPuntajesAscendentes proc
-        XOR SI, SI
-        XOR DI, DI
-        ordenarElementosBurbuja 1, 0, 0 ; ascendete - puntajes
-        ret
-    ordenarPuntajesAscendentes endp
-
-    ordenarPuntajesDescendentes proc
-        XOR SI, SI
-        XOR DI, DI
-        ordenarElementosBurbuja 0, 0 , 0; descendertee - Puntajes
-        ret
-    ordenarPuntajesDescendentes endp
-
-    ordenarTiemposAscendentes proc
-        XOR SI, SI
-        XOR DI, DI
-        ordenarElementosBurbuja 1, 1,1 ; ascendente - tiempos
-        ret
-    ordenarTiemposAscendentes endp
-
-    ordenarTiemposDescendentes proc
-        XOR SI, SI
-        XOR DI, DI
-        ordenarElementosBurbuja 0, 1,1 ; descendertee - tiempos
-        ret
-    ordenarTiemposDescendentes endp
-
-    ;ordenarPorBubble proc
-    ;    ret
-    ;ordenarPorBubble endp  
+    ordenarPorBubble proc
+        PUSH SI
+        PUSH DI
+        MOV ch, DS:[Graficador.cuentaPuntajesActuales]
+        MOV ch, 12
+        MOV cl, ch ;la copia servirá para el numero de iteraciones, iteraciones = numElementos
+        dec ch; burbuja realiza comparaciones, donde comparaciones = numElementos - 1 
+        elegirOrden:
+            MOV SI, 0
+            MOV DI, digitosMaximosEvaluacion ;dado que entre centenas, decenas y unidades hay 3 posiciones de diferencia
+            ;MOV ch, DS:[Graficador.cuentaPuntajesActuales]
+            MOV ch, 12
+            dec ch
+            cmp lectorEntradaOrden[0], '1'; 1 indica ascendentes
+            je  ordenarAscendente 
+            jmp ordenarDescendente
+        ordenarAscendente:
+            ;MOV AL, indicadorComparacion
+            call elegirComparacion ; dl = 1 si pos1 > pos 2
+            cmp dl, 1
+            je intercambiarPuntajesAsc
+            jmp desplazarmeSiguienteAsc
+            desplazarmeSiguienteAsc:
+                ADD SI, digitosMaximosEvaluacion
+                ADD DI, digitosMaximosEvaluacion
+                jmp verificarRepeticionAsc
+            intercambiarPuntajesAsc:
+                ;MOV AL, indicadorIntercambio
+                call elegirIntercambio
+            verificarRepeticionAsc:   
+                dec ch
+                cmp ch, 0
+                jg ordenarAscendente
+                jmp fin
+        ordenarDescendente:
+            ;MOV AL, indicadorComparacion
+            call elegirComparacion ; dl = 0 si pos1 <  pos 2
+            cmp dl, 0
+            je intercambiarPuntajesDesc
+            jmp desplazarmeSiguienteDesc
+            desplazarmeSiguienteDesc:
+                ADD SI, digitosMaximosEvaluacion
+                ADD DI, digitosMaximosEvaluacion
+                jmp verificarRepeticionDesc
+            intercambiarPuntajesDesc:
+                ;MOV AL, indicadorIntercambio
+                call elegirIntercambio
+            verificarRepeticionDesc:   
+                dec ch
+                cmp ch, 0
+                jg ordenarDescendente
+                jmp fin
+        fin:
+            dec cl
+            cmp cl, 0
+            jge elegirOrden
+            POP DI
+            POP SI
+            ret
+    ordenarPorBubble endp  
 
 end

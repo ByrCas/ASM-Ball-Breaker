@@ -92,7 +92,7 @@ imprimirTop macro indicadorTitulo
          imprimirEnConsola tituloTopTiempos
         jmp fin
      fin:
-        imprimirEnConsola escritorFicheroActual[0]       
+        ;imprimirEnConsola escritorFicheroActual[0]       
 endm    
 
 accionarTopResultados macro indicadorAccion, indicadorOrden
@@ -399,6 +399,11 @@ validarParametrosReporte macro
         call pintarEscenario
         ;accion de ordenamiento
         call establecerModoTexto
+        call establecerValoresInicialesOrdenamiento
+        obtenerDataOrdenamientos
+        call ordenarPorBubble
+        ;imprimirEnConsola puntajesDesordenados
+        imprimirEnConsola tiemposDesordenados
         ;reporte:
         POP AX
         POP BX
@@ -487,70 +492,12 @@ obtenerDataOrdenamientos macro
        POP DI
        POP SI   
        ;imprimirEnConsola lectorEntradaFicheros[0]
-       ;imprimirEnConsola tiemposDesordenados
-       imprimirEnConsola puntajesDesordenados
+       imprimirEnConsola tiemposDesordenados
+       ;imprimirEnConsola puntajesDesordenados
        imprimirEnConsola debug
 endm 
 
-ordenarElementosBurbuja macro indicadorOrden,indicadorIntercambio, indicadorComparacion  
-   LOCAL elegirOrden, ordenarAscendente,desplazarmeSiguienteDesc, intercambiarPuntajesAsc,desplazarmeSiguienteAsc, verificarRepeticionAsc, ordenarDescendente, intercambiarPuntajesDesc,verificarRepeticionDesc, fin
-   PUSH SI
-   PUSH DI
-   MOV ch, DS:[Graficador.cuentaPuntajesActuales]
-   MOV cl, ch ;la copia servirá para el numero de iteraciones, iteraciones = numElementos
-   dec ch; burbuja realiza comparaciones, donde comparaciones = numElementos - 1 
-   MOV AH, indicadorOrden
-   elegirOrden:
-      MOV SI, 0
-      MOV DI, digitosMaximosEvaluacion ;dado que entre centenas, decenas y unidades hay 3 posiciones de diferencia
-      MOV ch, DS:[Graficador.cuentaPuntajesActuales]
-      dec ch
-      cmp ah, 0; 0 indica descendentes
-      je  ordenarDescendente
-      jmp ordenarAscendente
-      ordenarAscendente:
-         MOV AL, indicadorComparacion
-         call elegirComparacion ; dl = 1 si pos1 > pos 2
-         cmp dl, 1
-         je intercambiarPuntajesAsc
-         jmp desplazarmeSiguienteAsc
-         desplazarmeSiguienteAsc:
-            ADD SI, digitosMaximosEvaluacion
-            ADD DI, digitosMaximosEvaluacion
-            jmp verificarRepeticionAsc
-         intercambiarPuntajesAsc:
-            MOV AL, indicadorIntercambio
-            call elegirIntercambio
-         verificarRepeticionAsc:   
-            dec ch
-            cmp ch, 0
-            jg ordenarAscendente
-            jmp fin
-      ordenarDescendente:
-         MOV AL, indicadorComparacion
-         call elegirComparacion ; dl = 0 si pos1 <  pos 2
-         cmp dl, 0
-         je intercambiarPuntajesDesc
-         jmp desplazarmeSiguienteDesc
-         desplazarmeSiguienteDesc:
-            ADD SI, digitosMaximosEvaluacion
-            ADD DI, digitosMaximosEvaluacion
-            jmp verificarRepeticionDesc
-         intercambiarPuntajesDesc:
-            MOV AL, indicadorIntercambio
-            call elegirIntercambio
-         verificarRepeticionDesc:   
-            dec ch
-            cmp ch, 0
-            jg ordenarDescendente
-            jmp fin
-   fin:
-      dec cl
-      cmp cl, 0
-      jg elegirOrden
-      POP DI
-      POP SI
-endm
+
 
 
 
