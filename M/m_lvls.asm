@@ -6,7 +6,7 @@ dibujarCaparazon macro ;obstaculos de nivel 1
     MOV di, anchoBloque ; las lineas horizontales del bloque tendran 20 pixeles de longitud
     dibujarContornoCaparazon
     dibujarPrimeraCapaCaparazon
-    ;dibujarSegundaCapaCaparazon
+    dibujarSegundaCapaCaparazon
     dibujarTerceraCapaCaparazon
     ;dibujarCuartaCapaCaparazon
     call establecerSegmentoDatos
@@ -230,26 +230,26 @@ dibujarBordesHorizontales macro
     dibujarBloque
     call incrementarBloquesDestruibles
     ;LINEA HORIZONTAL INFERIOR 
-    MOV ax, 120 ;fila
-    MOV bx, 85 ;columna
-    dibujarBloque
-    call incrementarBloquesDestruibles
-    MOV ax, 120 ;fila
-    MOV bx, 110 ;columna
-    dibujarBloque
-    call incrementarBloquesDestruibles
-    MOV ax, 120 ;fila
-    MOV bx, 135 ;columna
-    dibujarBloque
-    call incrementarBloquesDestruibles
-    MOV ax, 120 ;fila
-    MOV bx, 160 ;columna
-    dibujarBloque
-    call incrementarBloquesDestruibles
-    MOV ax, 120 ;fila
-    MOV bx, 185 ;columna
-    dibujarBloque
-    call incrementarBloquesDestruibles
+    ;MOV ax, 120 ;fila
+    ;MOV bx, 85 ;columna
+    ;dibujarBloque
+    ;call incrementarBloquesDestruibles
+    ;MOV ax, 120 ;fila
+    ;MOV bx, 110 ;columna
+    ;dibujarBloque
+    ;call incrementarBloquesDestruibles
+    ;MOV ax, 120 ;fila
+    ;MOV bx, 135 ;columna
+    ;dibujarBloque
+    ;call incrementarBloquesDestruibles
+    ;MOV ax, 120 ;fila
+    ;MOV bx, 160 ;columna
+    ;dibujarBloque
+    ;call incrementarBloquesDestruibles
+    ;MOV ax, 120 ;fila
+    ;MOV bx, 185 ;columna
+    ;dibujarBloque
+    ;call incrementarBloquesDestruibles
 endm
 
 dibujarBordesVerticales macro

@@ -202,7 +202,7 @@ gameOver db retornoCR,saltoLn,'---@@@@--@--@@@@@--@@@@--@@@@@-@--@--@@@@-@@@@'
 partidaExitosa  db retornoCR,saltoLn,'---@@@@--@--@@@--@--@@-@@@-@@@--@--@'
                 db retornoCR,saltoLn,'---@----@-@-@-@-@-@-@---@--@----@--@'
                 db retornoCR,saltoLn,'---@-@@-@@@-@-@-@@@-@@--@--@@@--@--@'
-                db retornoCR,saltoLn,'---@--@-@-@-@-@-@-@--@--@--@-------'
+                db retornoCR,saltoLn,'---@--@-@-@-@-@-@-@--@--@--@--------'
                 db retornoCR,saltoLn,'---@@@@-@-@-@-@-@-@-@@--@--@@@--*--*',retornoCR,saltoLn,finCadena
 
 ;======== ALERTAS/TITULOS EN MODO VIDEO =======
@@ -331,7 +331,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             call establecerModoVideo
             call pintarPrimerNivel
             call establecerModoTexto
-            ;finalizarJuego
+            finalizarJuego
 		    cmp DS:[Configurador.estadoPartida], indicadorPartidaGanada
             je  notificarJugadaExitosa
             jmp notificarGameOver   
@@ -415,6 +415,8 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         MOV plataformaMovible.filaActual, posFilaInicialPlataforma
         MOV plataformaMovible.columnaActual, posColumnaInicialPlataforma
         MOV pelota.estadoDireccion, direccionNoroesteActiva
+        MOV plataformaMovible.filaActual, posFilaInicialPlataforma
+        MOV plataformaMovible.columnaActual, posColumnaInicialPlataforma
         call reiniciarCronometro
         call reiniciarTiempo
         call reiniciarPuntajeJuego
@@ -431,6 +433,8 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         MOV pelota.filaActual, posFilaInicialPelota
         MOV pelota.columnaActual, posColumnaInicialPelota
         MOV pelota.estadoDireccion, direccionNoroesteActiva
+        MOV plataformaMovible.filaActual, posFilaInicialPlataforma
+        MOV plataformaMovible.columnaActual, posColumnaInicialPlataforma
         call establecerDireccionVideo
         limpiarEscenario
         ret
@@ -471,7 +475,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         call dibujarMarcoGrafico
         call dibujarPlataforma
         call dibujarPelotaEstandar
-        dibujarCaparazon
+        dibujarCaja
         call imprimirDatosDeNivel
         call solicitarTeclaEspacio
         chequearCambios 
@@ -490,7 +494,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
         call dibujarMarcoGrafico
         call dibujarPlataforma
         call dibujarPelotaEstandar
-        dibujarCaparazon
+        dibujarMensajeColorido
         call imprimirDatosDeNivel
         call solicitarTeclaEspacio
         chequearCambios  ;aqui no se compaan los estados dado que es el ultimo nivel, siempre saldrá del juego
@@ -759,6 +763,7 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             je destruccionFinalizada
             MOV dx, posMargenMaximoVertical
             sub dx, pelota.pixelesAncho
+            dec dx
             ;inc dx; si estuviera uno antes/a la par del margen maximo vertical se restringe
             cmp pelota.columnaActual, dx
             je destruccionFinalizada
@@ -768,13 +773,14 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
             je destruccionFinalizada
             MOV dx, posMargenMaximoHorizontal
             SUB dx, pelota.pixelesAlto ; la altura ocuoa espacio antes de que llegue exactamente a esa fila
+            dec dx
             dec dx; si estuviera uno antes/por endima  del margen maximo horizontal se restringe
             cmp pelota.filaActual, dx
             je verificarFinalizacionJuego
-        verificarDestruccionPorEsquinas:
+        ;verificarDestruccionPorEsquinas:
            ;call evaluarChoqueEsquinas
-           cmp DS:[Configurador.controladorBloque], indicadorBloqueEliminado
-           je destruccionFinalizada
+         ;  cmp DS:[Configurador.controladorBloque], indicadorBloqueEliminado
+          ; je destruccionFinalizada
         verificarDestruccionVertical:
             evaluarRebotesVerticalesDestructivos
             ;call establecerSegmentoDatos
@@ -1317,330 +1323,5 @@ pelota ElementoGrafico <5, alturaPelota, posFilaInicialPelota, posColumnaInicial
 
     ;=============================== ORDENAMIENTOS: ==================================================
 
-    ;ejecutarOrdenamiento proc
-     ;   call establecerValoresInicialesOrdenamiento
-      ;  obtenerDataOrdenamientos
-       ; ret
-    ;ejecutarOrdenamiento endp
-    
-    establecerValoresInicialesOrdenamiento proc
-        MOV DS:[Graficador.cuentaPuntajesActuales],0    
-        MOV DS:[Graficador.cuentaTiemposActuales],0 
-        ret 
-    establecerValoresInicialesOrdenamiento endp
-
-    intercambiarPuntaje proc
-        PUSH DX
-        PUSH CX
-        PUSH BX
-        PUSH DI
-        ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
-        ;DI en "emplearCopiaAuxiliar", lo que alteraria su valor
-        XOR cx, cx ;inicializamos en 0 para realizar las cuentas
-        xor di, di 
-        MOV BX, SI 
-        ;necesitamos guardar SI ya que se usará para trasladar al auxiliar la información,
-        ;pero necesitamos esa misma posición original para realizar despues el intercambio
-        emplearCopiaAuxiliar:
-            MOV dl, puntajesDesordenados[si]
-            MOV auxiliarDeCambioDigito[di], dl 
-            ;se maneja con DI ya que SI llevará un indice que se increntará
-            ;constantemente durante el ordenamiento, y al auxiliar isempre
-            ; debemos evaluarlo iniciando desde 0, 
-            inc si
-            inc di
-            inc cx
-            cmp cx, digitosMaximosEvaluacion  
-            jl emplearCopiaAuxiliar ;mientras las evaluaciones no pasen el número de digitos max (3)
-            xor cx, cx
-            POP DI ;Recuperamos el valor original actual de DI
-            MOV SI, BX ;obtenemos el valor original de SI actual
-        intercambiar:
-            PUSH DI 
-            ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
-            ;DI para el acceso al auxiliar, lo que alteraria su valor
-            MOV dl, puntajesDesordenados[di]
-            MOV puntajesDesordenados[si], dl
-            MOV DI, cx; la cuenta coincide con la posicipón necesaria en el acceso a auxiliar
-            MOV dl, auxiliarDeCambioDigito[di]
-            POP DI ;recuperamos verdadero el valor que necesitamos
-            MOV puntajesDesordenados[di], dl
-            inc si
-            inc di
-            inc cx 
-            cmp cx, digitosMaximosEvaluacion
-            jl intercambiar
-        fin:
-            ;Dada la ultima iteración tanto SI como DI queadan poisicionados
-            ;en el indice exacto donde se necesita para próximas evaluaciones
-            ;cuando se emplea en ordenamientos
-            POP BX
-            POP CX
-            POP DX
-            ret
-    intercambiarPuntaje endp
-
-    compararPuntajes proc
-        PUSH AX ;En la posicion actual de si y di realiza la comparación
-        PUSH SI 
-        ;en este proc se alteran SI y DI pero como solo es para comparar
-        ;usamos la pila para guardar el valor original que servirá en otras subrutinas
-        PUSH DI
-        compararCentenas:
-            MOV al, puntajesDesordenados[di]
-            ADD al, diferenciaASCII
-            MOV ah, puntajesDesordenados[si]
-            ADD ah, diferenciaASCII
-            cmp ah, al
-            jg  indicarMayor ;pos 1 > pos 2
-            cmp ah, al
-            jl  indicarMenor ;pos 2 > pos 1
-        compararDecenas:
-            inc si
-            inc di
-            MOV al, puntajesDesordenados[di]
-            ADD al, diferenciaASCII
-            MOV ah, puntajesDesordenados[si]
-            ADD ah, diferenciaASCII
-            cmp ah, al
-            jg  indicarMayor ;pos 1 > pos 2
-            cmp ah, al
-            jl  indicarMenor ;pos 2 > pos 1
-        compararUnidades:
-            inc si
-            inc di
-            MOV al, puntajesDesordenados[di]
-            ADD al, diferenciaASCII
-            MOV ah, puntajesDesordenados[si]
-            ADD ah, diferenciaASCII
-            cmp ah, al
-            jg  indicarMayor ;pos 1 > pos 2
-            cmp ah, al
-            jl  indicarMenor ;pos 2 > pos 1
-            cmp ah, al
-            je indicarIgual
-        indicarMayor:; dl == 1, indicando que pos1 > pos2
-            MOV dl, 1
-            cmp dl, 1 
-            je finComparacionPuntajes
-        indicarMenor:
-            MOV dl, 0
-            cmp dl, 0 
-            je finComparacionPuntajes
-        indicarIgual:
-            MOV dl, 2
-            cmp dl, 2
-            je finComparacionPuntajes
-        finComparacionPuntajes:
-            POP DI
-            POP SI
-            POP AX
-            ret
-    compararPuntajes endp 
-
-    intercambiarTiempo proc
-        PUSH DX
-        PUSH CX
-        PUSH BX
-        PUSH DI
-        ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
-        ;DI en "emplearCopiaAuxiliar", lo que alteraria su valor
-        XOR cx, cx ;inicializamos en 0 para realizar las cuentas
-        xor di, di 
-        MOV BX, SI 
-        ;necesitamos guardar SI ya que se usará para trasladar al auxiliar la información,
-        ;pero necesitamos esa misma posición original para realizar despues el intercambio
-        emplearCopiaTiempoAuxiliar:
-            MOV dl, tiemposDesordenados[si]
-            MOV auxiliarDeCambioDigito[di], dl 
-            ;se maneja con DI ya que SI llevará un indice que se increntará
-            ;constantemente durante el ordenamiento, y al auxiliar isempre
-            ; debemos evaluarlo iniciando desde 0, 
-            inc si
-            inc di
-            inc cx
-            cmp cx, digitosMaximosEvaluacion  
-            jl emplearCopiaTiempoAuxiliar ;mientras las evaluaciones no pasen el número de digitos max (3)
-            xor cx, cx
-            POP DI ;Recuperamos el valor original actual de DI
-            MOV SI, BX ;obtenemos el valor original de SI actual
-        intercambiarTm:
-            PUSH DI 
-            ;Guardamos DI porque necesitamos el valor actual pero necesitamos emplear
-            ;DI para el acceso al auxiliar, lo que alteraria su valor
-            MOV dl, tiemposDesordenados[di]
-            MOV tiemposDesordenados[si], dl
-            MOV DI, cx; la cuenta coincide con la posicipón necesaria en el acceso a auxiliar
-            MOV dl, auxiliarDeCambioDigito[di]
-            POP DI ;recuperamos verdadero el valor que necesitamos
-            MOV tiemposDesordenados[di], dl
-            inc si
-            inc di
-            inc cx 
-            cmp cx, digitosMaximosEvaluacion
-            jl intercambiarTm
-        finIntercambioTiempo:
-            ;Dada la ultima iteración tanto SI como DI queadan poisicionados
-            ;en el indice exacto donde se necesita para próximas evaluaciones
-            ;cuando se emplea en ordenamientos
-            POP BX
-            POP CX
-            POP DX
-            ret
-    intercambiarTiempo endp
-
-    compararTiempos proc
-        PUSH AX ;En la posicion actual de si y di realiza la comparación
-        PUSH SI 
-        ;en este proc se alteran SI y DI pero como solo es para comparar
-        ;usamos la pila para guardar el valor original que servirá en otras subrutinas
-        PUSH DI
-        compararCentenas:
-            MOV al, tiemposDesordenados[di]
-            ADD al, diferenciaASCII
-            MOV ah, tiemposDesordenados[si]
-            ADD ah, diferenciaASCII
-            cmp ah, al
-            jg  indicarMayor ;pos 1 > pos 2
-            cmp ah, al
-            jl  indicarMenor ;pos 2 > pos 1
-        compararDecenas:
-            inc si
-            inc di
-            MOV al, tiemposDesordenados[di]
-            ADD al, diferenciaASCII
-            MOV ah, tiemposDesordenados[si]
-            ADD ah, diferenciaASCII
-            cmp ah, al
-            jg  indicarMayor ;pos 1 > pos 2
-            cmp ah, al
-            jl  indicarMenor ;pos 2 > pos 1
-        compararUnidades:
-            inc si
-            inc di
-            MOV al, tiemposDesordenados[di]
-            ADD al, diferenciaASCII
-            MOV ah, tiemposDesordenados[si]
-            ADD ah, diferenciaASCII
-            cmp ah, al
-            jg  indicarMayor ;pos 1 > pos 2
-            cmp ah, al
-            jl  indicarMenor ;pos 2 > pos 1
-            cmp ah, al
-            je indicarIgual
-        indicarMayor:; dl == 1, indicando que pos1 > pos2
-            MOV dl, 1
-            cmp dl, 1 
-            je finComparacionTiempos
-        indicarMenor:
-            MOV dl, 0
-            cmp dl, 0 
-            je finComparacionTiempos
-        indicarIgual:
-            MOV dl, 2
-            cmp dl, 2
-            je finComparacionTiempos
-        finComparacionTiempos:
-            POP DI
-            POP SI
-            POP AX
-            ret
-    compararTiempos endp 
-
-
-    elegirIntercambio proc
-        PUSH AX
-        ;Asume que AL tiene el indicador de cual intercambio usar
-        cmp lectorEntradaTop[0], '1' ;o es indicador de intercambio de puntajes
-        je intercambiarParejaPuntajes
-        jmp intercambioParejaTiempos
-        intercambiarParejaPuntajes:
-            call intercambiarPuntaje
-            ;cmp al, 0 
-            jmp finalizarIntercambios
-        intercambioParejaTiempos:
-            call intercambiarTiempo
-        finalizarIntercambios:
-            POP AX
-            ret
-    elegirIntercambio endp
-
-    elegirComparacion proc 
-        PUSH AX
-        ;Asume que AL tiene el indicador de cual comparacion usar
-        cmp lectorEntradaTop[0], '1' ;o es indicador de intercambio de puntajes
-        je compararParejaPuntajes
-        jmp compararParejaTiempos
-        compararParejaPuntajes:
-            call compararPuntajes
-            ;cmp al, 0 
-            jmp finalizarComparaciones
-        compararParejaTiempos:
-            call compararTiempos
-        finalizarComparaciones:
-            POP AX
-            ret
-    elegirComparacion endp
-
-    ordenarPorBubble proc
-        PUSH SI
-        PUSH DI
-        MOV ch, DS:[Graficador.cuentaPuntajesActuales]
-        MOV ch, 12
-        MOV cl, ch ;la copia servirá para el numero de iteraciones, iteraciones = numElementos
-        dec ch; burbuja realiza comparaciones, donde comparaciones = numElementos - 1 
-        elegirOrden:
-            MOV SI, 0
-            MOV DI, digitosMaximosEvaluacion ;dado que entre centenas, decenas y unidades hay 3 posiciones de diferencia
-            ;MOV ch, DS:[Graficador.cuentaPuntajesActuales]
-            MOV ch, 12
-            dec ch
-            cmp lectorEntradaOrden[0], '1'; 1 indica ascendentes
-            je  ordenarAscendente 
-            jmp ordenarDescendente
-        ordenarAscendente:
-            ;MOV AL, indicadorComparacion
-            call elegirComparacion ; dl = 1 si pos1 > pos 2
-            cmp dl, 1
-            je intercambiarPuntajesAsc
-            jmp desplazarmeSiguienteAsc
-            desplazarmeSiguienteAsc:
-                ADD SI, digitosMaximosEvaluacion
-                ADD DI, digitosMaximosEvaluacion
-                jmp verificarRepeticionAsc
-            intercambiarPuntajesAsc:
-                ;MOV AL, indicadorIntercambio
-                call elegirIntercambio
-            verificarRepeticionAsc:   
-                dec ch
-                cmp ch, 0
-                jg ordenarAscendente
-                jmp fin
-        ordenarDescendente:
-            ;MOV AL, indicadorComparacion
-            call elegirComparacion ; dl = 0 si pos1 <  pos 2
-            cmp dl, 0
-            je intercambiarPuntajesDesc
-            jmp desplazarmeSiguienteDesc
-            desplazarmeSiguienteDesc:
-                ADD SI, digitosMaximosEvaluacion
-                ADD DI, digitosMaximosEvaluacion
-                jmp verificarRepeticionDesc
-            intercambiarPuntajesDesc:
-                ;MOV AL, indicadorIntercambio
-                call elegirIntercambio
-            verificarRepeticionDesc:   
-                dec ch
-                cmp ch, 0
-                jg ordenarDescendente
-                jmp fin
-        fin:
-            dec cl
-            cmp cl, 0
-            jge elegirOrden
-            POP DI
-            POP SI
-            ret
-    ordenarPorBubble endp  
 
 end

@@ -1,8 +1,5 @@
 adminAP,1234;
-arqui,1001;
-byrcas,8080;
 Byron,1536;
-lorem,0412;
-asm,0000;
-GERARDO,1842;
-Masm,8181;
+arqui,1010;
+byrcas,8080;
+calib,1234;
